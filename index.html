@@ -468,7 +468,7 @@ function openTxnFor(cardId){
 }
 paymentForm.onsubmit=async e=>{
   e.preventDefault();const b=document.getElementById('savePayment');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';
-  try{const cardId=paymentForm.dataset.cardId,c=state.cards.find(x=>x.id===cardId);const amount=Number(paymentAmount.value||0),remaining=outstanding(c);if(amount<=0)throw new Error('Payment amount must be greater than ₹0.');if(amount>remaining)throw new Error(`Payment cannot exceed the outstanding amount of ${money(remaining)}.`);
+  try{const cardId=paymentForm.dataset.cardId,c=state.cards.find(x=>x.id===cardId);const amount=Number(paymentAmount.value||0),remaining=outstanding(c);if(amount<=0)throw new Error('Payment amount must be greater than ₹0.');
     const aisBefore=aisForCard(c)?.total||0;await put('transactions',{id:id(),cardId,date:dateForStorage(paymentForm.paymentDate.value),merchant:'Bill Payment',amount,type:'PAYMENT',status:'COMPLETED',refundDate:''});paymentDialog.close();await load();const aisAfter=aisForCard(c);let payMsg=amount>=remaining?'✓ Bill marked paid':'✓ Partial payment added';if(aisAfter&&aisAfter.level!=='ok'&&(aisBefore/aisLimit()*100<(aisAfter.level==='crossed'?100:aisWarnPct())))payMsg+=' · ⚠ '+aisMessage(aisAfter);toast(payMsg);if(detailDialog.open)openCard(cardId);
   }catch(err){toast('Could not save payment: '+err.message)}finally{b.disabled=false;b.textContent='Add Payment'}
 };
