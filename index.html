@@ -32,7 +32,7 @@
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.card-milestones{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.milestone-label{font-size:12px;font-weight:700;margin-bottom:8px}.milestone{margin-top:8px}.milestonehead{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px}.milestone-actions{display:flex;align-items:center;gap:8px}.milestone-edit-btn{padding:5px 8px;font-size:12px}.bar{height:7px;background:var(--soft);border-radius:99px;overflow:hidden;margin:7px 0}.fill{height:100%;background:var(--accent);border-radius:99px}.empty{padding:24px;text-align:center;color:var(--muted)}.payment-actions{flex-wrap:wrap}.btn:disabled{opacity:.65;cursor:default}.checkfield{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}.checkfield input{width:auto}.badge.warn{color:var(--warn)}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}.tab{background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--muted);font-weight:600;white-space:nowrap;margin-bottom:-1px}.tab.active{color:var(--text);border-bottom-color:var(--accent)}.tabbadge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:999px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;text-align:center}
 .attgroup{margin-bottom:22px}.attrows{overflow:hidden}.attrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}.attrow:last-child{border-bottom:0}.attmain{flex:1;min-width:0}.attrow .btn{flex:none}
 .bankhead{margin:14px 0 0;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.bankhead:first-child{margin-top:0}.bankhead span{font-weight:500}
-.bankgrid{display:flex;flex-wrap:wrap;gap:8px;padding:14px}.bankchip{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}.bankchip .bc{color:var(--muted);font-size:12px;margin-left:2px}.chipbtn{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:999px;line-height:1}.chipbtn:hover{color:var(--accent)}.msbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}.msbar select{padding:6px 10px;font-size:13px}.msbar .spacer{flex:1}.achieved{opacity:.7}
+.bankgrid{display:flex;flex-wrap:wrap;gap:8px;padding:14px}.bankchip{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}.bankchip .bc{color:var(--muted);font-size:12px;margin-left:2px}.chipbtn{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:999px;line-height:1}.chipbtn:hover{color:var(--accent)}.msbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}.msbar select{padding:6px 10px;font-size:13px}.msbar .spacer{flex:1}.achieved{opacity:.7}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.filterchip{padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;white-space:nowrap}.filterchip:hover{border-color:var(--accent)}.filterchip.active{border-color:var(--accent);color:var(--accent)}.monthhead{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 8px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.monthhead:first-child{margin-top:0}.monthhead span:last-child{color:var(--text);font-weight:600;text-transform:none;letter-spacing:0;font-size:13px}
     dialog{border:1px solid var(--line);border-radius:16px;padding:0;background:var(--panel);color:var(--text);width:min(560px,calc(100vw - 28px));box-shadow:0 20px 70px #0006}dialog::backdrop{background:#0008}.modal{padding:20px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.modal h2{font-size:20px;margin:0;letter-spacing:-.03em}.form{display:grid;gap:12px}.field{display:grid;gap:5px}.label{font-size:12px;color:var(--muted)}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modalfoot{display:flex;justify-content:end;gap:8px;margin-top:18px}.milestone-edit{border:1px solid var(--line);border-radius:12px;padding:12px}.toast{position:fixed;right:20px;bottom:20px;background:var(--accent);color:#21180f;padding:11px 14px;border-radius:10px;display:none;z-index:5;font-weight:650}.toast.show{display:block}
     @media(max-width:700px){.shell{padding:16px}.stat{padding:12px}.stat strong{font-size:18px}.attrow .btn{padding:7px 10px;font-size:13px}.hero{align-items:start;flex-direction:column}.grid2,.formrow{grid-template-columns:1fr}.bill-reminder{align-items:start;flex-direction:column}.top{margin-bottom:20px}}
   </style>
@@ -76,8 +76,10 @@
     </div>
 
     <div class="tabpane" id="tab-transactions" hidden>
-      <div class="sectionhead"><div class="sectiontitle">Recent transactions</div><button class="btn primary" id="addTxn">+ Add Transaction</button></div>
-      <div id="transactions" class="panel"></div>
+      <div class="sectionhead"><div><div class="sectiontitle">Transactions</div><div class="muted" id="txnFySummary"></div></div><button class="btn primary" id="addTxn">+ Add Transaction</button></div>
+      <div class="toolbar"><input class="search" id="txnSearch" placeholder="Search merchant..."></div>
+      <div class="chips" id="txnCardChips"></div>
+      <div id="transactions"></div>
     </div>
 
     <div class="tabpane" id="tab-ais" hidden>
@@ -104,6 +106,7 @@
 <div class="formrow"><div class="field"><label class="label">Bank</label><select name="bank" id="cardBank" required></select><input name="newBank" id="cardNewBank" placeholder="New bank name" style="margin-top:8px" hidden></div><div class="field"><label class="label">Card name</label><input name="name" required></div></div>
 <div class="formrow"><div class="field"><label class="label">Network</label><select name="network"><option>Visa</option><option>Mastercard</option><option>Amex</option><option>RuPay</option></select></div><div class="field"><label class="label">Last 4 digits</label><input name="last4" maxlength="4" inputmode="numeric"></div></div>
 <div class="formrow"><div class="field"><label class="label">Statement day</label><input name="statementDay" type="number" min="1" max="31" required></div><div class="field"><label class="label">Due day</label><input name="dueDay" type="number" min="1" max="31" required></div></div>
+<div class="field"><label class="label">Rewards rate (%)</label><input name="rewardRatePct" type="number" min="0" step="0.01" value="0"></div>
 <div class="field"><label class="checkfield"><input type="checkbox" id="cardLifetimeFree" name="lifetimeFree"> Lifetime free (no annual fee)</label></div>
 <div id="feeDetailsGroup">
 <div class="formrow"><div class="field"><label class="label">Annual fee</label><input id="cardAnnualFee" name="annualFee" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Renewal date (day-month)</label><input id="cardRenewalDate" name="renewalDate" class="dm-input" type="text" inputmode="numeric" placeholder="DD-MM" maxlength="5" pattern="[0-9]{2}-[0-9]{2}"></div></div>
@@ -144,7 +147,7 @@
 
 <dialog id="detailDialog"><div class="modal" style="max-height:88vh;overflow:auto"><div class="modalhead"><h2 id="detailTitle">Card</h2><div style="display:flex;gap:8px"><button class="iconbtn" id="editCardBtn" title="Edit card details">✎</button><button class="iconbtn" onclick="detailDialog.close()">×</button></div></div><div id="detailContent"></div></div></dialog>
 
-<dialog id="txnDialog"><div class="modal"><div class="modalhead"><h2>Add transaction</h2><button class="iconbtn" onclick="txnDialog.close()">×</button></div>
+<dialog id="txnDialog"><div class="modal"><div class="modalhead"><h2 id="txnDialogTitle">Add transaction</h2><button class="iconbtn" onclick="txnDialog.close()">×</button></div>
 <form id="txnForm" class="form">
 <div class="field"><label class="label">Card</label><select name="cardId" id="txnCard" required></select></div>
 <div class="formrow"><div class="field"><label class="label">Date</label><input name="date" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}" required></div><div class="field"><label class="label">Amount</label><input name="amount" type="number" min="0.01" step="0.01" required></div></div>
@@ -273,9 +276,31 @@ function renderCards(){
   cards.forEach(c=>{if(c.bank!==last){out+=`<div class="bankhead">${esc(c.bank)} <span>· ${counts[c.bank]}</span></div>`;last=c.bank}out+=cardRowHtml(c)});
   document.getElementById('cards').innerHTML=out||'<div class="panel empty">No cards found.</div>';
 }
+const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function monthLabel(dateStr){const m=dateStr.match(/^(\d{4})-(\d{2})-/);return m?`${MONTH_NAMES[Number(m[2])-1].toUpperCase()} ${m[1]}`:''}
+function rewardFor(t,c){if(t.type!=='PURCHASE'||t.status==='REFUNDED')return 0;const rate=Number(c&&c.rewardRatePct||0);return rate>0?Number(t.amount)*rate/100:0}
 function renderTransactions(){
-  const ts=[...state.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,50);
-  document.getElementById('transactions').innerHTML=ts.length?ts.map(t=>{const c=state.cards.find(x=>x.id===t.cardId),ref=t.status==='REFUNDED',pay=t.type==='PAYMENT';return `<div class="cardrow" style="border-bottom:1px solid var(--line)"><div class="cardmain"><div><div class="cardname ${ref?'txn-refunded':''}">${esc(t.merchant)}</div><div class="meta">${esc(displayDate(t.date))} · ${esc(c?.bank||'Unknown bank')} · ${esc(c?.name||'Unknown card')} ${pay?'· <span class="badge paid">PAYMENT</span>':''}${ref?`· <span class="badge refunded">REFUNDED${t.refundDate?' · '+esc(displayDate(t.refundDate)):''}</span>`:''}</div></div><div class="txn-actions"><strong class="${ref?'txn-refunded':''}">${money(t.amount)}</strong><button class="iconbtn" title="${ref?'Undo refund':'Mark as refunded'}" onclick="event.stopPropagation();${ref?`undoRefund('${t.id}')`:`openRefund('${t.id}')`}">⋮</button></div></div></div>`}).join(''):'<div class="empty">No transactions yet.</div>';
+  const cardsWithTxns=[...new Set(state.transactions.map(t=>t.cardId))].map(id=>state.cards.find(c=>c.id===id)).filter(Boolean).sort((a,b)=>String(a.bank).localeCompare(String(b.bank))||String(a.name).localeCompare(String(b.name)));
+  const selected=localStorage.getItem('cardly-txn-card')||'all';
+  document.getElementById('txnCardChips').innerHTML=`<button class="filterchip${selected==='all'?' active':''}" onclick="setTxnCardFilter('all')">All cards</button>`+cardsWithTxns.map(c=>`<button class="filterchip${selected===c.id?' active':''}" onclick="setTxnCardFilter('${c.id}')">${esc(c.name)}</button>`).join('');
+  const fy=fyRange(),fyTxns=state.transactions.filter(t=>t.type==='PURCHASE'&&t.status!=='REFUNDED'&&t.date>=fy.start&&t.date<=fy.end);
+  const fySpend=fyTxns.reduce((a,t)=>a+Number(t.amount),0),fyRewards=fyTxns.reduce((a,t)=>a+rewardFor(t,state.cards.find(x=>x.id===t.cardId)),0);
+  document.getElementById('txnFySummary').textContent=`${fy.label}: ${money(fySpend)} spent${fyRewards>0?` · ${money(fyRewards)} rewards`:''}`;
+  const q=(document.getElementById('txnSearch').value||'').toLowerCase();
+  const list=state.transactions.filter(t=>(selected==='all'||t.cardId===selected)&&(!q||t.merchant.toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!list.length){document.getElementById('transactions').innerHTML='<div class="panel empty">No transactions found.</div>';return}
+  let out='',lastMonth=null,rows=[],monthTotal=0,monthReward=0;
+  const flush=()=>{if(lastMonth!==null)out+=`<div class="monthhead"><span>${lastMonth}</span><span>${money(monthTotal)}${monthReward>0?` · <span style="color:var(--good)">+${money(monthReward)}</span>`:''}</span></div><div class="list">${rows.join('')}</div>`};
+  list.forEach(t=>{
+    const label=monthLabel(t.date);
+    if(label!==lastMonth){flush();lastMonth=label;rows=[];monthTotal=0;monthReward=0}
+    const c=state.cards.find(x=>x.id===t.cardId),reward=rewardFor(t,c);
+    if(t.type==='PURCHASE'&&t.status!=='REFUNDED'){monthTotal+=Number(t.amount);monthReward+=reward}
+    const ref=t.status==='REFUNDED',pay=t.type==='PAYMENT';
+    rows.push(`<div class="panel cardrow"><div class="cardmain"><div><div class="cardname ${ref?'txn-refunded':''}">${esc(t.merchant)}</div><div class="meta">${esc(displayDate(t.date))} · ${esc(c?.bank||'Unknown bank')} · ${esc(c?.name||'Unknown card')} ${pay?'· <span class="badge paid">PAYMENT</span>':''}${ref?`· <span class="badge refunded">REFUNDED${t.refundDate?' · '+esc(displayDate(t.refundDate)):''}</span>`:''}</div></div><div class="txn-actions"><div style="text-align:right"><strong class="${ref?'txn-refunded':''}">${money(t.amount)}</strong>${reward>0?`<div class="meta" style="color:var(--good)">+${money(reward)}</div>`:''}</div><button class="iconbtn" title="Edit" onclick="openEditTxn('${t.id}')">✎</button><button class="iconbtn" title="Delete" onclick="deleteTxn('${t.id}')">🗑</button><button class="iconbtn" title="${ref?'Undo refund':'Mark as refunded'}" onclick="${ref?`undoRefund('${t.id}')`:`openRefund('${t.id}')`}">⋮</button></div></div></div>`);
+  });
+  flush();
+  document.getElementById('transactions').innerHTML=out;
 }
 function renderAis(){
   const list=aisSummary(),fyr=fyRange(),used=list.filter(g=>g.total>0),idle=list.filter(g=>!(g.total>0));
@@ -405,6 +430,7 @@ function openEditCard(cardId){
   cardForm.last4.value=c.last4||'';
   cardForm.statementDay.value=c.statementDay||'';
   cardForm.dueDay.value=c.dueDay||'';
+  cardForm.rewardRatePct.value=Number(c.rewardRatePct||0);
   cardLifetimeFree.checked=Boolean(c.lifetimeFree);
   cardAnnualFee.value=Number(c.annualFee||0);
   cardRenewalDate.value=displayDayMonth(c.renewalDate);
@@ -464,8 +490,22 @@ function openPayment(cardId,markPaid=false){
   paymentDialog.showModal();
 }
 function openTxnFor(cardId){
-  txnForm.reset(); setDateField(txnForm.date,today()); txnCard.innerHTML=state.cards.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${c.id===cardId?'selected':''}>${esc(c.bank)} · ${esc(c.name)}</option>`).join(''); txnDialog.showModal();
+  txnForm.reset(); txnForm.dataset.txnId=''; txnDialogTitle.textContent='Add transaction'; saveTxn.textContent='Add Transaction';
+  setDateField(txnForm.date,today()); txnCard.innerHTML=state.cards.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${c.id===cardId?'selected':''}>${esc(c.bank)} · ${esc(c.name)}</option>`).join(''); txnDialog.showModal();
 }
+function openEditTxn(txnId){
+  const t=state.transactions.find(x=>x.id===txnId);if(!t)return;
+  txnForm.reset(); txnForm.dataset.txnId=txnId; txnDialogTitle.textContent='Edit transaction'; saveTxn.textContent='Save Changes';
+  txnCard.innerHTML=state.cards.filter(c=>c.active!==false||c.id===t.cardId).map(c=>`<option value="${c.id}" ${c.id===t.cardId?'selected':''}>${esc(c.bank)} · ${esc(c.name)}</option>`).join('');
+  setDateField(txnForm.date,t.date); txnForm.merchant.value=t.merchant; txnForm.amount.value=Number(t.amount);
+  txnDialog.showModal();
+}
+async function deleteTxn(txnId){
+  const t=state.transactions.find(x=>x.id===txnId);if(!t)return;
+  if(!confirm(`Delete this ${money(t.amount)} transaction at "${t.merchant}"? This can't be undone.`))return;
+  await del('transactions',txnId);await load();toast('✓ Transaction deleted');
+}
+function setTxnCardFilter(cardId){localStorage.setItem('cardly-txn-card',cardId);renderTransactions()}
 paymentForm.onsubmit=async e=>{
   e.preventDefault();const b=document.getElementById('savePayment');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';
   try{const cardId=paymentForm.dataset.cardId,c=state.cards.find(x=>x.id===cardId);const amount=Number(paymentAmount.value||0),remaining=outstanding(c);if(amount<=0)throw new Error('Payment amount must be greater than ₹0.');
@@ -484,13 +524,13 @@ cardForm.onsubmit=async e=>{
     const f=new FormData(e.target),editingId=cardForm.dataset.cardId,fee=readFeeFields(f),bankName=bankFromForm(f);
     if(editingId){
       const c=state.cards.find(x=>x.id===editingId);if(!c)throw new Error('Card not found.');
-      c.bank=bankName;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.statementDay=Number(f.get('statementDay'));c.dueDay=Number(f.get('dueDay'));
+      c.bank=bankName;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.statementDay=Number(f.get('statementDay'));c.dueDay=Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);
       c.lifetimeFree=fee.lifetimeFree;c.annualFee=fee.annualFee;c.renewalDate=fee.renewalDate;
       await put('cards',c);
       await syncFeeWaiverMilestone(c,fee.waiverAmt);
       cardDialog.close();await load();toast('✓ Card updated');openCard(c.id);
     }else{
-      const card={id:id(),bank:bankName,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),statementDay:Number(f.get('statementDay')),dueDay:Number(f.get('dueDay')),currentBill:Number(f.get('currentBill')||0),billDate:f.get('billDate')?dateForStorage(f.get('billDate')):today(),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
+      const card={id:id(),bank:bankName,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),statementDay:Number(f.get('statementDay')),dueDay:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),currentBill:Number(f.get('currentBill')||0),billDate:f.get('billDate')?dateForStorage(f.get('billDate')):today(),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
       await put('cards',card);
       await syncFeeWaiverMilestone(card,fee.waiverAmt);
       for(const r of document.querySelectorAll('.milestone-edit'))await put('milestones',{id:id(),cardId:card.id,name:r.querySelector('.mname').value,periodType:r.querySelector('.mtype').value,targetAmount:Number(r.querySelector('.mtarget').value),active:true});
@@ -499,13 +539,28 @@ cardForm.onsubmit=async e=>{
   }catch(err){toast('Could not save card: '+err.message)}
   finally{b.disabled=false;b.textContent=cardForm.dataset.cardId?'Save Changes':'Save Card'}
 };
-txnForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveTxn');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const f=new FormData(e.target);await put('transactions',{id:id(),cardId:f.get('cardId'),date:dateForStorage(f.get('date')),merchant:f.get('merchant'),amount:Number(f.get('amount')),type:'PURCHASE',status:'COMPLETED',refundDate:''});txnDialog.close();await load();toast('✓ Transaction added')}catch(err){toast('Could not save transaction: '+err.message)}finally{b.disabled=false;b.textContent='Add Transaction'}};
+txnForm.onsubmit=async e=>{
+  e.preventDefault();const b=document.getElementById('saveTxn');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';
+  try{
+    const f=new FormData(e.target),editingId=txnForm.dataset.txnId,amount=Number(f.get('amount'));
+    if(!(amount>0))throw new Error('Amount must be greater than ₹0.');
+    const payload={cardId:f.get('cardId'),date:dateForStorage(f.get('date')),merchant:f.get('merchant'),amount};
+    if(editingId){
+      const t=state.transactions.find(x=>x.id===editingId);if(!t)throw new Error('Transaction not found.');
+      Object.assign(t,payload);await put('transactions',t);txnDialog.close();await load();toast('✓ Transaction updated');
+    }else{
+      await put('transactions',{id:id(),...payload,type:'PURCHASE',status:'COMPLETED',refundDate:''});
+      txnDialog.close();await load();toast('✓ Transaction added');
+    }
+  }catch(err){toast('Could not save transaction: '+err.message)}
+  finally{b.disabled=false;b.textContent=txnForm.dataset.txnId?'Save Changes':'Add Transaction'}
+};
 function openRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;refundForm.dataset.txnId=txnId;setDateField(refundForm.refundDate,t.refundDate||today());const c=state.cards.find(x=>x.id===t.cardId);refundSummary.innerHTML=`<div class="cardmain"><div><div class="cardname">${esc(t.merchant)}</div><div class="meta">${esc(c?.bank||'Unknown bank')} · ${esc(c?.name||'Unknown card')} · ${esc(displayDate(t.date))}</div></div><strong>${money(t.amount)}</strong></div>`;refundDialog.showModal()}
 refundForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveRefund');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const t=state.transactions.find(x=>x.id===refundForm.dataset.txnId);if(!t)throw new Error('Transaction not found.');t.status='REFUNDED';t.refundDate=dateForStorage(refundForm.refundDate.value);await put('transactions',t);refundDialog.close();await load();toast('✓ Transaction marked refunded');if(detailDialog.open)openCard(t.cardId)}catch(err){toast('Could not mark refund: '+err.message)}finally{b.disabled=false;b.textContent='Mark Refunded'}};
 async function undoRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;t.status='COMPLETED';t.refundDate='';await put('transactions',t);await load();toast('✓ Refund removed');if(detailDialog.open)openCard(t.cardId)};
 document.querySelectorAll('.date-input').forEach(field=>field.addEventListener('input',()=>{const digits=field.value.replace(/\D/g,'').slice(0,8);field.value=digits.length>4?`${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4)}`:digits.length>2?`${digits.slice(0,2)}-${digits.slice(2)}`:digits}));
 document.querySelectorAll('.dm-input').forEach(field=>field.addEventListener('input',()=>{const digits=field.value.replace(/\D/g,'').slice(0,4);field.value=digits.length>2?`${digits.slice(0,2)}-${digits.slice(2)}`:digits}));
-search.oninput=render;statusFilter.onchange=render;msSort.onchange=()=>{localStorage.setItem('cardly-ms-sort',msSort.value);render()};msCount.onchange=()=>{localStorage.setItem('cardly-ms-count',msCount.value);render()};theme.onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cardly-theme',d.dataset.theme)};document.documentElement.dataset.theme=localStorage.getItem('cardly-theme')||'light';
+search.oninput=render;statusFilter.onchange=render;txnSearch.oninput=renderTransactions;msSort.onchange=()=>{localStorage.setItem('cardly-ms-sort',msSort.value);render()};msCount.onchange=()=>{localStorage.setItem('cardly-ms-count',msCount.value);render()};theme.onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cardly-theme',d.dataset.theme)};document.documentElement.dataset.theme=localStorage.getItem('cardly-theme')||'light';
 const supportsDirectFileAccess='showOpenFilePicker'in window&&'showSaveFilePicker'in window;
 document.getElementById('openDataFile').onclick=()=>chooseDataFile(false);document.getElementById('createDataFile').onclick=()=>chooseDataFile(true);document.getElementById('resumeDataFile').onclick=reopenLastDataFile;document.getElementById('importDataFile').onclick=()=>document.getElementById('dataFileInput').click();document.getElementById('dataFileInput').onchange=e=>{const file=e.target.files[0];if(file)importDataFile(file);e.target.value=''};document.getElementById('exportDataFile').onclick=exportMobileData;
 if(supportsDirectFileAccess){getRememberedFileHandle().then(async handle=>{if(!handle)return;const permission=await handle.queryPermission({mode:'readwrite'});if(permission==='granted')await useDataFile(handle);else document.getElementById('resumeDataFile').hidden=false}).catch(()=>{})}else{document.getElementById('dataGateTitle').textContent='Import your Cardly data';document.getElementById('dataGateDescription').textContent='Choose cardly-data.json from the Files app. Cardly will keep your changes on this iPhone until you export an updated file back to iCloud Drive.';document.getElementById('openDataFile').hidden=true;document.getElementById('createDataFile').hidden=true;document.getElementById('importDataFile').hidden=false;getMobileData().then(async data=>{if(!data)return;mobileStorage=true;applyData(data);await load();showDashboard()}).catch(()=>setFileError('Could not open this browser’s saved Cardly data.'))}
