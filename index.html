@@ -32,7 +32,7 @@
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.card-milestones{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.milestone-label{font-size:12px;font-weight:700;margin-bottom:8px}.milestone{margin-top:8px}.milestonehead{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px}.milestone-actions{display:flex;align-items:center;gap:8px}.milestone-edit-btn{padding:5px 8px;font-size:12px}.bar{height:7px;background:var(--soft);border-radius:99px;overflow:hidden;margin:7px 0}.fill{height:100%;background:var(--accent);border-radius:99px}.empty{padding:24px;text-align:center;color:var(--muted)}.payment-actions{flex-wrap:wrap}.btn:disabled{opacity:.65;cursor:default}.checkfield{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer}.checkfield input{width:auto}.badge.warn{color:var(--warn)}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 22px;overflow-x:auto}.tab{background:transparent;border:0;border-bottom:2px solid transparent;padding:10px 14px;color:var(--muted);font-weight:600;white-space:nowrap;margin-bottom:-1px}.tab.active{color:var(--text);border-bottom-color:var(--accent)}.tabbadge{display:inline-block;min-width:18px;padding:1px 6px;margin-left:6px;border-radius:999px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;text-align:center}
 .attgroup{margin-bottom:22px}.attrows{overflow:hidden}.attrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}.attrow:last-child{border-bottom:0}.attmain{flex:1;min-width:0}.attrow .btn{flex:none}
 .bankhead{margin:14px 0 0;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.bankhead:first-child{margin-top:0}.bankhead span{font-weight:500}
-.bankgrid{display:flex;flex-wrap:wrap;gap:8px;padding:14px}.bankchip{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}.bankchip .bc{color:var(--muted);font-size:12px;margin-left:2px}.chipbtn{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:999px;line-height:1}.chipbtn:hover{color:var(--accent)}
+.bankgrid{display:flex;flex-wrap:wrap;gap:8px;padding:14px}.bankchip{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}.bankchip .bc{color:var(--muted);font-size:12px;margin-left:2px}.chipbtn{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:999px;line-height:1}.chipbtn:hover{color:var(--accent)}.msbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:2px}.msbar select{padding:6px 10px;font-size:13px}.msbar .spacer{flex:1}.achieved{opacity:.7}
     dialog{border:1px solid var(--line);border-radius:16px;padding:0;background:var(--panel);color:var(--text);width:min(560px,calc(100vw - 28px));box-shadow:0 20px 70px #0006}dialog::backdrop{background:#0008}.modal{padding:20px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.modal h2{font-size:20px;margin:0;letter-spacing:-.03em}.form{display:grid;gap:12px}.field{display:grid;gap:5px}.label{font-size:12px;color:var(--muted)}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modalfoot{display:flex;justify-content:end;gap:8px;margin-top:18px}.milestone-edit{border:1px solid var(--line);border-radius:12px;padding:12px}.toast{position:fixed;right:20px;bottom:20px;background:var(--accent);color:#21180f;padding:11px 14px;border-radius:10px;display:none;z-index:5;font-weight:650}.toast.show{display:block}
     @media(max-width:700px){.shell{padding:16px}.stat{padding:12px}.stat strong{font-size:18px}.attrow .btn{padding:7px 10px;font-size:13px}.hero{align-items:start;flex-direction:column}.grid2,.formrow{grid-template-columns:1fr}.bill-reminder{align-items:start;flex-direction:column}.top{margin-bottom:20px}}
   </style>
@@ -66,6 +66,8 @@
         <div class="stat"><strong id="dueTotal">₹0</strong><span>Current dues</span></div>
       </div>
       <div id="homeAttention"></div>
+      <div class="msbar"><span class="sectiontitle" style="font-size:14px">Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select><span class="spacer"></span><span class="sectiontitle" style="font-size:14px">Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></div>
+      <div id="msSection"></div>
     </div>
 
     <div class="tabpane" id="tab-cards" hidden>
@@ -93,10 +95,6 @@
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">AIS tracker</div><div class="muted">Banks report bill payments to the Income Tax Dept at or above this amount per financial year.</div></div></div>
       <div class="panel" style="padding:16px"><div class="formrow"><div class="field"><label class="label">Reporting limit (₹)</label><input id="aisLimitInput" type="number" min="1" step="1"></div><div class="field"><label class="label">Warn me at (% of limit)</label><input id="aisWarnInput" type="number" min="1" max="100" step="1"></div></div></div>
-    </section>
-    <section class="section">
-      <div class="sectionhead"><div><div class="sectiontitle">Home alerts</div><div class="muted">What the Home tab brings to your attention.</div></div></div>
-      <div class="panel" style="padding:16px"><div class="field"><label class="label">Show incomplete milestones ending within (days)</label><input id="milestoneDaysInput" type="number" min="1" max="366" step="1"></div></div>
     </section>
   </main>
 </div>
@@ -218,39 +216,48 @@ function setTab(t){
 }
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{setTab(b.dataset.tab);window.scrollTo(0,0)});
 function dueLabel(d){return d<0?`Overdue by ${-d} day${-d===1?'':'s'}`:d===0?'Due today':`Due in ${d} day${d===1?'':'s'}`}
-function attRow(inner,btn){return `<div class="attrow"><div class="attmain">${inner}</div>${btn}</div>`}
+function attRow(inner,btn,cls=''){return `<div class="attrow${cls?' '+cls:''}"><div class="attmain">${inner}</div>${btn}</div>`}
 function attSection(title,sub,rows){return `<div class="attgroup"><div class="sectionhead"><div><div class="sectiontitle">${title} <span class="muted">· ${rows.length}</span></div><div class="muted">${sub}</div></div></div><div class="panel attrows">${rows.join('')}</div></div>`}
-function milestoneAttention(){
-  const win=milestoneAlertDays(),out=[];
+function allMilestones(){
+  const out=[];
   state.milestones.forEach(m=>{
     if(m.active===false)return;const c=state.cards.find(x=>x.id===m.cardId);if(!c||c.active===false)return;
     const target=Number(m.targetAmount);if(!(target>0))return;
     const [start,end]=periodRange(m.periodType,c);if(!end)return;
-    const left=daysUntil(end);if(left===null||left<0||left>win)return;
-    const v=spend(m.cardId,m.periodType);if(v>=target)return;
+    const left=daysUntil(end);if(left===null)return;
+    const v=spend(m.cardId,m.periodType),achieved=v>=target;
     const startLeft=start?daysUntil(start):0,totalSpan=Math.max(1,left-startLeft),elapsed=Math.min(totalSpan,Math.max(0,-startLeft));
     const expectedFrac=elapsed/totalSpan,actualFrac=Math.min(1,v/target),lag=expectedFrac-actualFrac;
-    out.push({m,c,v,target,left,end,expectedFrac,actualFrac,lag});
+    out.push({m,c,v,target,left,end,achieved,expectedFrac,actualFrac,lag});
   });
-  return out.sort((a,b)=>b.lag-a.lag||a.left-b.left);
+  return out;
 }
+const MS_SORTS={
+  pace:(a,b)=>b.lag-a.lag||a.left-b.left,
+  ending:(a,b)=>a.left-b.left,
+  achieved:(a,b)=>(b.achieved-a.achieved)||(b.achieved?b.v-a.v:b.lag-a.lag)
+};
+function milestoneSort(){const v=localStorage.getItem('cardly-ms-sort');return MS_SORTS[v]?v:'pace'}
+function milestoneCount(){const v=localStorage.getItem('cardly-ms-count');return v==='all'||['10','20','50'].includes(v)?v:'10'}
 function renderHome(){
+  msSort.value=milestoneSort();msCount.value=milestoneCount();
   const active=state.cards.filter(c=>c.active!==false),unpaidAll=state.cards.filter(c=>status(c)!=='paid');
   document.getElementById('cardCount').textContent=active.length;
   document.getElementById('unpaidCount').textContent=unpaidAll.length;
   document.getElementById('dueTotal').textContent=money(unpaidAll.reduce((a,c)=>a+outstanding(c),0));
   const unpaid=active.filter(c=>status(c)!=='paid').map(c=>({c,d:daysUntil(dueDate(c))})).sort((a,b)=>(a.d===null?9999:a.d)-(b.d===null?9999:b.d));
   const billUpdates=active.filter(needsBillUpdate);
-  const ms=milestoneAttention();
+  const msAll=allMilestones().sort(MS_SORTS[milestoneSort()]);
+  const msN=milestoneCount(),ms=msN==='all'?msAll:msAll.slice(0,Number(msN));
   const fees=active.filter(feeDueSoon).map(c=>({c,rd:nextRenewalDate(c)})).sort((a,b)=>a.rd.localeCompare(b.rd));
   const ais=aisSummary().filter(g=>g.level==='crossed');
   let out='';
   if(unpaid.length)out+=attSection('Unpaid bills','Overdue first, then by due date.',unpaid.map(({c,d})=>{const late=d!==null&&d<0,soon=d!==null&&d<=DUE_REMINDER_DAYS;return attRow(`<div class="cardname">${esc(c.bank)} · ${esc(c.name)}</div><div class="meta"${late?' style="color:var(--bad)"':''}>${d===null?'Due date unknown':`${dueLabel(d)} · ${esc(displayDate(dueDate(c)))}`} · Outstanding ${money(outstanding(c))}</div>`,`<button class="btn${soon?' primary':''}" onclick="openPayment('${c.id}')">+ Add Payment</button>`)}));
   if(billUpdates.length)out+=attSection('Bill details needed',`Add the latest bill issued on or before ${esc(displayDate(today()))}.`,billUpdates.map(c=>{const sd=latestStatementDate(c);return attRow(`<div class="cardname">${esc(c.bank)} · ${esc(c.name)}</div><div class="meta">Statement date ${esc(displayDate(sd))} · not updated after two days</div>`,`<button class="btn primary" onclick="openBill('${c.id}','${sd}')">Add Bill Details</button>`)}));
-  if(ms.length)out+=attSection('Milestones closing soon',`Incomplete and ending within ${milestoneAlertDays()} days, most behind pace first.`,ms.map(({m,c,v,target,left,end})=>attRow(`<div class="cardname">${esc(c.bank)} · ${esc(c.name)} — ${esc(m.name)}</div><div class="meta">${money(v)} of ${money(target)} · ${money(target-v)} to go · ${left===0?'ends today':`${left} day${left===1?'':'s'} left`} (${esc(displayDate(end))})${m.periodType==='MEMBERSHIP_YEAR'&&Number(c.annualFee)>0?` · waives ${money(c.annualFee)} fee`:''}</div><div class="bar" style="margin-top:8px"><div class="fill" style="width:${Math.min(100,v/target*100)}%"></div></div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)));
+  document.getElementById('msSection').innerHTML=msAll.length?attSection('Milestones',`Showing ${ms.length} of ${msAll.length}.`,ms.map(({m,c,v,target,left,end,achieved})=>attRow(`<div class="cardname">${achieved?'✓ ':''}${esc(c.bank)} · ${esc(c.name)} — ${esc(m.name)}</div><div class="meta">${money(v)} of ${money(target)}${achieved?' · achieved':` · ${money(target-v)} to go`} · ${left===0?'ends today':`${left} day${left===1?'':'s'} left`} (${esc(displayDate(end))})${m.periodType==='MEMBERSHIP_YEAR'&&Number(c.annualFee)>0?` · waives ${money(c.annualFee)} fee`:''}</div><div class="bar" style="margin-top:8px"><div class="fill" style="width:${Math.min(100,v/target*100)}%"></div></div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`,achieved?'achieved':''))):'<div class="panel empty">No milestones configured on any card yet.</div>';
   if(fees.length)out+=attSection('Annual fee renewals coming up','Decide whether to keep the card before the fee posts.',fees.map(({c,rd})=>{const d=daysUntil(rd);return attRow(`<div class="cardname">${esc(c.bank)} · ${esc(c.name)}</div><div class="meta">Renews ${esc(displayDate(rd))} (in ${d} day${d===1?'':'s'}) · Fee ${money(c.annualFee)}</div>`,`<button class="btn" onclick="openCard('${c.id}')">Review</button>`)}));
   if(ais.length)out+=attSection('AIS reporting limit','Bill payments per bank this financial year.',ais.map(g=>attRow(`<div class="cardname">${esc(g.bank)} · limit reached</div><div class="meta">${esc(aisMessage(g))}</div>`,`<button class="btn" onclick="setTab('ais')">View</button>`)));
-  const count=unpaid.length+billUpdates.length+ms.length+fees.length+ais.length,badge=document.getElementById('homeBadge');
+  const count=unpaid.length+billUpdates.length+fees.length+ais.length,badge=document.getElementById('homeBadge');
   badge.hidden=!count;badge.textContent=count;
   document.getElementById('homeAttention').innerHTML=out||'<div class="panel empty">All clear — nothing needs your attention right now.</div>';
 }
@@ -324,11 +331,9 @@ function ensureSettings(){
   if(!Array.isArray(s.banks)){const seen=new Set(),list=[];state.cards.forEach(c=>{const b=String(c.bank||'').trim(),k=b.toLowerCase();if(b&&!seen.has(k)){seen.add(k);list.push(b)}});s.banks=list.sort((a,b)=>a.localeCompare(b));changed=true}
   if(!(Number(s.aisLimit)>0)){s.aisLimit=1000000;changed=true}
   if(!(Number(s.aisWarnPct)>0&&Number(s.aisWarnPct)<=100)){s.aisWarnPct=80;changed=true}
-  if(!(Number(s.milestoneAlertDays)>=1)){s.milestoneAlertDays=45;changed=true}
   return changed;
 }
 function aisLimit(){return Number(state.settings&&state.settings.aisLimit)||1000000}
-function milestoneAlertDays(){return Number(state.settings&&state.settings.milestoneAlertDays)||45}
 function aisWarnPct(){return Number(state.settings&&state.settings.aisWarnPct)||80}
 function bankIndex(name){const k=String(name||'').trim().toLowerCase();return state.settings.banks.findIndex(b=>b.toLowerCase()===k)}
 function addBankToSettings(name){name=String(name||'').trim();if(!name)return '';const i=bankIndex(name);if(i>=0)return state.settings.banks[i];state.settings.banks.push(name);state.settings.banks.sort((a,b)=>a.localeCompare(b));return name}
@@ -346,10 +351,9 @@ function renderSettings(){
   const counts=new Map();state.cards.forEach(c=>{const k=String(c.bank||'').trim().toLowerCase();counts.set(k,(counts.get(k)||0)+1)});
   const banks=state.settings.banks;
   document.getElementById('bankList').innerHTML=banks.length?banks.map((b,i)=>{const n=counts.get(b.toLowerCase())||0;return `<span class="bankchip"><span>${esc(b)}</span><span class="bc">${n}</span><button class="chipbtn" title="Rename" onclick="renameBank(${i})">✎</button>${n?'':`<button class="chipbtn" title="Remove (no cards use it)" onclick="removeBank(${i})">✕</button>`}</span>`}).join(''):'<span class="muted">No banks yet. Add one below.</span>';
-  aisLimitInput.value=aisLimit();aisWarnInput.value=aisWarnPct();milestoneDaysInput.value=milestoneAlertDays();
+  aisLimitInput.value=aisLimit();aisWarnInput.value=aisWarnPct();
 }
 async function commitSettings(msg){try{await saveDataFile();renderSettings();if(msg)toast(msg)}catch(err){toast('Could not save settings: '+err.message)}}
-milestoneDaysInput.onchange=async()=>{const v=Math.round(Number(milestoneDaysInput.value));if(!(v>=1&&v<=366)){toast('Enter a number of days between 1 and 366.');renderSettings();return}state.settings.milestoneAlertDays=v;await commitSettings('✓ Saved')};
 async function addBankFromSetting(name){const n=String(name||'').trim();if(!n)return;if(bankIndex(n)>=0){toast('That bank is already in the list.');return}addBankToSettings(n);await commitSettings('✓ Bank added')}
 async function renameBank(i){const old=state.settings.banks[i],name=String(prompt('Rename bank',old)||'').trim();if(!name||name===old)return;const j=bankIndex(name);if(j>=0&&j!==i){toast('That bank already exists.');return}state.settings.banks[i]=name;state.cards.forEach(c=>{if(String(c.bank||'').trim().toLowerCase()===old.toLowerCase())c.bank=name});state.settings.banks.sort((a,b)=>a.localeCompare(b));await commitSettings('✓ Bank renamed')}
 async function removeBank(i){const b=state.settings.banks[i];if(state.cards.some(c=>String(c.bank||'').trim().toLowerCase()===b.toLowerCase())){toast('Cards still use this bank.');return}state.settings.banks.splice(i,1);await commitSettings('✓ Bank removed')}
@@ -501,7 +505,7 @@ refundForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById
 async function undoRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;t.status='COMPLETED';t.refundDate='';await put('transactions',t);await load();toast('✓ Refund removed');if(detailDialog.open)openCard(t.cardId)};
 document.querySelectorAll('.date-input').forEach(field=>field.addEventListener('input',()=>{const digits=field.value.replace(/\D/g,'').slice(0,8);field.value=digits.length>4?`${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4)}`:digits.length>2?`${digits.slice(0,2)}-${digits.slice(2)}`:digits}));
 document.querySelectorAll('.dm-input').forEach(field=>field.addEventListener('input',()=>{const digits=field.value.replace(/\D/g,'').slice(0,4);field.value=digits.length>2?`${digits.slice(0,2)}-${digits.slice(2)}`:digits}));
-search.oninput=render;statusFilter.onchange=render;theme.onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cardly-theme',d.dataset.theme)};document.documentElement.dataset.theme=localStorage.getItem('cardly-theme')||'light';
+search.oninput=render;statusFilter.onchange=render;msSort.onchange=()=>{localStorage.setItem('cardly-ms-sort',msSort.value);render()};msCount.onchange=()=>{localStorage.setItem('cardly-ms-count',msCount.value);render()};theme.onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cardly-theme',d.dataset.theme)};document.documentElement.dataset.theme=localStorage.getItem('cardly-theme')||'light';
 const supportsDirectFileAccess='showOpenFilePicker'in window&&'showSaveFilePicker'in window;
 document.getElementById('openDataFile').onclick=()=>chooseDataFile(false);document.getElementById('createDataFile').onclick=()=>chooseDataFile(true);document.getElementById('resumeDataFile').onclick=reopenLastDataFile;document.getElementById('importDataFile').onclick=()=>document.getElementById('dataFileInput').click();document.getElementById('dataFileInput').onchange=e=>{const file=e.target.files[0];if(file)importDataFile(file);e.target.value=''};document.getElementById('exportDataFile').onclick=exportMobileData;
 if(supportsDirectFileAccess){getRememberedFileHandle().then(async handle=>{if(!handle)return;const permission=await handle.queryPermission({mode:'readwrite'});if(permission==='granted')await useDataFile(handle);else document.getElementById('resumeDataFile').hidden=false}).catch(()=>{})}else{document.getElementById('dataGateTitle').textContent='Import your Cardly data';document.getElementById('dataGateDescription').textContent='Choose cardly-data.json from the Files app. Cardly will keep your changes on this iPhone until you export an updated file back to iCloud Drive.';document.getElementById('openDataFile').hidden=true;document.getElementById('createDataFile').hidden=true;document.getElementById('importDataFile').hidden=false;getMobileData().then(async data=>{if(!data)return;mobileStorage=true;applyData(data);await load();showDashboard()}).catch(()=>setFileError('Could not open this browser’s saved Cardly data.'))}
