@@ -51,7 +51,7 @@
     <p id="dataFileError" class="data-error" role="status"></p>
   </main>
   <main id="dashboard" hidden>
-    <div class="hero"><div><div class="eyebrow">Personal credit card manager</div><div class="title">Dashboard</div><div class="sub">Your data stays on this device.</div></div><div class="hero-actions"><button class="btn" id="exportDataFile" hidden>Export Data</button><button class="btn" id="addCard">+ Add Card</button></div></div>
+    <div class="hero"><div><div class="eyebrow">Personal credit card manager</div><div class="title">Dashboard</div><div class="sub">Your data stays on this device.</div></div><div class="hero-actions"><button class="btn" id="exportDataFile" hidden>Export Data</button></div></div>
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="home">Home<span class="tabbadge" id="homeBadge" hidden></span></button>
       <button class="tab" data-tab="cards">Cards</button>
@@ -71,7 +71,7 @@
     </div>
 
     <div class="tabpane" id="tab-cards" hidden>
-      <div class="toolbar"><input class="search" id="search" placeholder="Search cards..."><select id="statusFilter"><option value="all">All status</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select></div>
+      <div class="toolbar"><input class="search" id="search" placeholder="Search cards..."><select id="statusFilter"><option value="all">All status</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select><button class="btn primary" id="addCard">+ Add Card</button></div>
       <div id="cards" class="list"></div>
     </div>
 
