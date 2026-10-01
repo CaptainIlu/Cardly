@@ -184,7 +184,8 @@ function dateForStorage(value){const m=String(value||'').trim().match(/^(\d{2})-
 function displayDayMonth(value){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}-${m[2]}`:''}
 function dateForStorageFromDayMonth(value){const m=String(value||'').trim().match(/^(\d{2})-(\d{2})$/);if(!m)throw new Error('Enter the renewal date as DD-MM.');const day=Number(m[1]),month=Number(m[2]),t=today(),thisYear=Number(t.slice(0,4));const build=year=>{const d=new Date(year,month-1,day);if(d.getFullYear()!==year||d.getMonth()!==month-1||d.getDate()!==day)return null;return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`};for(let y=thisYear;y<=thisYear+8;y++){const candidate=build(y);if(candidate&&candidate>=t)return candidate}throw new Error('Enter a valid date as DD-MM.')}
 function setDateField(field,value){field.value=displayDate(value)}
-function dueDate(c){const m=String(c.billDate||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return '';const billDay=Number(m[3]),dueDay=Number(c.dueDay||1),year=Number(m[1]),month=Number(m[2])-1,dueMonth=dueDay<=billDay?month+1:month,lastDay=new Date(year,dueMonth+1,0).getDate(),date=new Date(year,dueMonth,Math.min(dueDay,lastDay));return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+function effectiveBillDate(c){const latest=latestStatementDate(c),stored=String(c.billDate||'');return latest&&stored<latest?latest:(stored||latest)}
+function dueDate(c){const m=String(effectiveBillDate(c)||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return '';const billDay=Number(m[3]),dueDay=Number(c.dueDay||1),year=Number(m[1]),month=Number(m[2])-1,dueMonth=dueDay<=billDay?month+1:month,lastDay=new Date(year,dueMonth+1,0).getDate(),date=new Date(year,dueMonth,Math.min(dueDay,lastDay));return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 function dateForMonth(year,month,day){const lastDay=new Date(year,month+1,0).getDate(),date=new Date(year,month,Math.min(day,lastDay));return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 function addDays(value,days){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return '';const date=new Date(Number(m[1]),Number(m[2])-1,Number(m[3])+days);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 function latestStatementDate(c){const day=Number(c.statementDay);if(!Number.isInteger(day)||day<1||day>31)return '';const now=new Date(),current=dateForMonth(now.getFullYear(),now.getMonth(),day);if(current<=today())return current;return dateForMonth(now.getFullYear(),now.getMonth()-1,day)}
@@ -209,7 +210,12 @@ function milestoneNote(c,m,v){if(m.periodType!=='MEMBERSHIP_YEAR')return '';cons
 function paidForCurrentBill(c){return state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.status!=='REFUNDED'&&t.date>=(c.billDate||'0000-01-01')).reduce((a,t)=>a+Number(t.amount||0),0)}
 function status(c){
   const bill=Number(c.currentBill||0), paid=paidForCurrentBill(c);
-  if(bill<=0 || paid>=bill)return 'paid';
+  if(bill>0&&paid>=bill)return 'paid';
+  if(bill<=0){
+    const latest=latestStatementDate(c);
+    if(latest&&String(c.billDate||'')<latest)return 'unpaid';
+    return 'paid';
+  }
   const due=dueDate(c);
   return due&&today()>due?'overdue':'unpaid';
 }
@@ -276,11 +282,11 @@ function renderHome(){
   if(ais.length)out+=attSection('AIS reporting limit','Bill payments per bank this financial year.',ais.map(g=>attRow(`<div class="cardname bnrow">${bankTag(g.bankId)}<span>${esc(g.bankName)} · limit reached</span></div><div class="meta">${esc(aisMessage(g))}</div>`,`<button class="btn" onclick="setTab('ais')">View</button>`)));
   const count=unpaid.length+billUpdates.length+msUrgent.length+fees.length+ais.length,badge=document.getElementById('homeBadge');
   badge.hidden=!count;badge.textContent=count;
-  document.getElementById('homeAttention').innerHTML=out||'<div class="panel empty">All clear — nothing needs your attention right now.</div>';
+  document.getElementById('homeAttention').innerHTML=out?`<div class="sectionhead"><div class="sectiontitle">Needs attention</div></div>${out}`:'<div class="panel empty">All clear — nothing needs your attention right now.</div>';
 }
 function cardRowHtml(c){
   const st=status(c),due=dueDate(c),cms=state.milestones.filter(m=>m.cardId===c.id&&m.active!==false),feeBadge=c.lifetimeFree?'<span class="badge">LTF</span>':(feeDueSoon(c)?`<span class="badge warn">Fee in ${daysUntil(nextRenewalDate(c))}d</span>`:'');
-  return `<div class="panel cardrow clickable" onclick="openCard('${c.id}')"><div class="cardmain"><div><div class="cardname">${esc(c.name)}</div><div class="meta">${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''} · Bill date ${esc(displayDate(c.billDate))} · Due date ${esc(displayDate(due))}</div></div><div class="badges"><span class="badge ${st}">${st.toUpperCase()}</span>${feeBadge}</div></div><div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>${cms.length?`<div class="card-milestones"><div class="milestone-label">Milestones</div>${cms.map(m=>{const v=spend(m.cardId,m.periodType),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone"><div class="milestonehead"><span>${esc(m.name)} · ${money(v)} / ${money(m.targetAmount)}</span><span>${Math.round(p)}%</span></div><div class="bar"><div class="fill" style="width:${p}%"></div></div>${note?`<div class="meta">${note}</div>`:''}</div>`}).join('')}</div>`:''}</div>`;
+  return `<div class="panel cardrow clickable" onclick="openCard('${c.id}')"><div class="cardmain"><div><div class="cardname">${esc(c.name)}</div><div class="meta">${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''} · Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(due))}</div></div><div class="badges"><span class="badge ${st}">${st.toUpperCase()}</span>${feeBadge}</div></div><div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>${cms.length?`<div class="card-milestones"><div class="milestone-label">Milestones</div>${cms.map(m=>{const v=spend(m.cardId,m.periodType),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone"><div class="milestonehead"><span>${esc(m.name)} · ${money(v)} / ${money(m.targetAmount)}</span><span>${Math.round(p)}%</span></div><div class="bar"><div class="fill" style="width:${p}%"></div></div>${note?`<div class="meta">${note}</div>`:''}</div>`}).join('')}</div>`:''}</div>`;
 }
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase(),f=document.getElementById('statusFilter').value;
@@ -357,6 +363,7 @@ function maybeSendNotifications(force=false){
   state.cards.filter(c=>c.active!==false).forEach(c=>{
     if(status(c)!=='paid'){const d=daysUntil(dueDate(c));if(d!==null&&d<=DUE_REMINDER_DAYS){const label=d<0?`overdue by ${-d} day${-d===1?'':'s'}`:d===0?'due today':`due in ${d} day${d===1?'':'s'}`;fire(`due-${c.id}-${todayKey}`,`${bankName(c.bankId)} · ${c.name} bill ${label}`,`Outstanding ${money(outstanding(c))}`)}}
     if(feeDueSoon(c)){const rd=nextRenewalDate(c),d=daysUntil(rd);fire(`fee-${c.id}-${rd}`,`${bankName(c.bankId)} · ${c.name} renews in ${d} day${d===1?'':'s'}`,`Annual fee ${money(c.annualFee)} on ${displayDate(rd)}`)}
+    if(needsBillUpdate(c)){const sd=latestStatementDate(c);fire(`billupdate-${c.id}-${sd}`,`${bankName(c.bankId)} · ${c.name}: add the latest bill`,`Statement date ${displayDate(sd)} — not updated after two days`)}
   });
   let aisSeen;try{aisSeen=JSON.parse(localStorage.getItem('cardly-ais-seen')||'[]')}catch{aisSeen=[]}
   const fyLabel=fyRange().label;
@@ -518,7 +525,7 @@ function openCard(cardId){
       <div class="detail-box"><div class="label">Outstanding</div><strong>${money(outstanding(c))}</strong></div>
     </div>
     <div class="detail-section panel cardrow">
-      <div class="cardmain"><div><div class="cardname">Payment status</div><div class="meta">Bill date ${esc(displayDate(c.billDate))} · Due date ${esc(displayDate(dueDate(c)))}</div></div><span class="badge ${st}">${st.toUpperCase()}</span></div>
+      <div class="cardmain"><div><div class="cardname">Payment status</div><div class="meta">Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(dueDate(c)))}</div></div><span class="badge ${st}">${st.toUpperCase()}</span></div>
       <div class="modalfoot payment-actions" style="margin-top:12px"><button class="btn" onclick="openBill('${c.id}')">Update Bill</button><button class="btn" onclick="openPayment('${c.id}')">+ Add Payment</button>${st==='paid'?'<button class="btn" disabled>✓ Bill Paid</button>':`<button class="btn primary" onclick="openPayment('${c.id}',true)">Mark Bill Paid</button>`}</div>
     </div>
     <div class="detail-section panel cardrow">
