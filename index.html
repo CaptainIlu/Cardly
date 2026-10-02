@@ -137,6 +137,7 @@
 <form id="billForm" class="form">
 <div id="billSummary" class="panel cardrow"></div>
 <div class="formrow"><div class="field"><label class="label">Bill amount</label><input id="billAmount" name="bill" type="number" min="0" step="0.01" required></div><div class="field"><label class="label">Bill date</label><input name="billDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}" required></div></div>
+<div class="field"><label class="checkfield"><input type="checkbox" id="billNotDue"> No bill this cycle (nothing was charged)</label></div>
 <div class="meta">Changing the bill date starts a new current-bill period. Older payment transactions remain in the history but won't reduce this bill.</div>
 <div class="modalfoot"><button type="button" class="btn" onclick="billDialog.close()">Cancel</button><button class="btn primary" id="saveBill">Save Bill</button></div>
 </form></div></dialog>
@@ -210,12 +211,7 @@ function milestoneNote(c,m,v){if(m.periodType!=='MEMBERSHIP_YEAR')return '';cons
 function paidForCurrentBill(c){return state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.status!=='REFUNDED'&&t.date>=(c.billDate||'0000-01-01')).reduce((a,t)=>a+Number(t.amount||0),0)}
 function status(c){
   const bill=Number(c.currentBill||0), paid=paidForCurrentBill(c);
-  if(bill>0&&paid>=bill)return 'paid';
-  if(bill<=0){
-    const latest=latestStatementDate(c);
-    if(latest&&String(c.billDate||'')<latest)return 'unpaid';
-    return 'paid';
-  }
+  if(bill<=0||paid>=bill)return 'paid';
   const due=dueDate(c);
   return due&&today()>due?'overdue':'unpaid';
 }
@@ -542,11 +538,16 @@ function openCard(cardId){
 }
 function openBill(cardId,suggestedBillDate=''){
   const c=state.cards.find(x=>x.id===cardId);if(!c)return;
-  billForm.dataset.cardId=cardId;billAmount.value=Number(c.currentBill||0);setDateField(billForm.billDate,suggestedBillDate||c.billDate||today());
-  billSummary.innerHTML=`<div class="cardmain"><div><div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}</span></div><div class="meta">Current outstanding: ${money(outstanding(c))}</div></div><span class="badge ${status(c)}">${status(c).toUpperCase()}</span></div>`;
+  billForm.dataset.cardId=cardId;
+  const liveDate=latestStatementDate(c),stored=String(c.billDate||'');
+  const defaultDate=suggestedBillDate||(liveDate&&stored<liveDate?liveDate:stored)||liveDate||today();
+  billAmount.value=Number(c.currentBill||0);setDateField(billForm.billDate,defaultDate);
+  billNotDue.checked=Boolean(c.billNotDue)&&stored===liveDate;billAmount.disabled=billNotDue.checked;billAmount.required=!billNotDue.checked;
+  billSummary.innerHTML=`<div class="cardmain"><div><div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}</span></div><div class="meta">Current outstanding: ${money(outstanding(c))}${c.billNotDue&&stored===liveDate?' · No bill this cycle':''}</div></div><span class="badge ${status(c)}">${status(c).toUpperCase()}</span></div>`;
   billDialog.showModal();
 }
-billForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveBill');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const c=state.cards.find(x=>x.id===billForm.dataset.cardId);if(!c)throw new Error('Card not found.');const bill=Number(billAmount.value||0);if(bill<0)throw new Error('Bill amount cannot be negative.');c.currentBill=bill;c.billDate=dateForStorage(billForm.billDate.value);await put('cards',c);billDialog.close();await load();toast('✓ Current bill updated');if(detailDialog.open)openCard(c.id)}catch(err){toast('Could not update bill: '+err.message)}finally{b.disabled=false;b.textContent='Save Bill'}};
+billNotDue.onchange=()=>{billAmount.disabled=billNotDue.checked;billAmount.required=!billNotDue.checked;if(billNotDue.checked)billAmount.value='0'};
+billForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveBill');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const c=state.cards.find(x=>x.id===billForm.dataset.cardId);if(!c)throw new Error('Card not found.');const bill=billNotDue.checked?0:Number(billAmount.value||0);if(bill<0)throw new Error('Bill amount cannot be negative.');c.currentBill=bill;c.billDate=dateForStorage(billForm.billDate.value);c.billNotDue=billNotDue.checked;await put('cards',c);billDialog.close();await load();toast(billNotDue.checked?'✓ Marked no bill this cycle':'✓ Current bill updated');if(detailDialog.open)openCard(c.id)}catch(err){toast('Could not update bill: '+err.message)}finally{b.disabled=false;b.textContent='Save Bill'}};
 function openPayment(cardId,markPaid=false){
   const c=state.cards.find(x=>x.id===cardId); if(!c)return;
   paymentForm.dataset.cardId=cardId;
