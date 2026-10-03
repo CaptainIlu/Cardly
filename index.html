@@ -33,6 +33,11 @@
 .attgroup{margin-bottom:22px}.attrows{overflow:hidden}.attrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}.attrow:last-child{border-bottom:0}.attmain{flex:1;min-width:0}.attrow .btn{flex:none}
 .bankhead{margin:14px 0 0;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.bankhead:first-child{margin-top:0}.bankhead span{font-weight:500}
 .bankgrid{display:flex;flex-wrap:wrap;gap:8px;padding:14px}.bankchip{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}.bankchip .bc{color:var(--muted);font-size:12px;margin-left:2px}.chipbtn{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:999px;line-height:1}.chipbtn:hover{color:var(--accent)}.msbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:24px;margin-bottom:14px;padding-top:14px;border-top:1px solid var(--line)}
+#pullRefresh{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;color:var(--accent);font-size:13px;font-weight:700;background:var(--bg);z-index:999;transition:height .15s}
+#pullRefresh span{display:inline-block}
+#pullRefresh.spin span{animation:pr-spin 0.8s linear infinite}
+@keyframes pr-spin{to{transform:rotate(360deg)}}
+.pull-refresh{position:fixed;top:0;left:0;right:0;height:50px;display:flex;align-items:center;justify-content:center;transform:translateY(-50px);background:var(--panel);color:var(--muted);font-size:13px;font-weight:600;z-index:999;padding-top:env(safe-area-inset-top,0px);border-bottom:1px solid var(--line)}
 .bankbadge{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;font-size:10px;font-weight:700;color:#fff;flex:none;letter-spacing:-.02em;object-fit:cover;background:var(--soft)}
 .bankbadge.lg{width:30px;height:30px;border-radius:9px;font-size:12px}
 .bnrow{display:flex;align-items:flex-start;gap:7px}
@@ -42,6 +47,8 @@
   </style>
 </head>
 <body>
+<div id="pullRefresh"><span>↻ Refreshing…</span></div>
+<div id="pullRefresh" class="pull-refresh">↓ Pull to refresh</div>
 <div class="shell">
   <header class="top">
     <div class="brand"><svg width="24" height="24" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="100" height="100" rx="24" fill="#ff7800"/><rect x="20" y="32" width="60" height="40" rx="7" fill="#fffaf4"/><rect x="20" y="32" width="60" height="13" fill="#21180f"/><rect x="27" y="56" width="20" height="8" rx="2" fill="#ff7800"/></svg>CARDLY</div>
@@ -212,7 +219,7 @@ function billingCycleRange(c){if(!c)return ['',''];const closed=latestStatementD
 function periodRange(type,c){if(type==='BILLING_CYCLE')return billingCycleRange(c);const d=new Date(), y=d.getFullYear(),m=d.getMonth(),day=d.getDate();let start,end;if(type==='CALENDAR_MONTH'){start=new Date(y,m,1);end=new Date(y,m+1,0)}else if(type==='CALENDAR_QUARTER'){const q=Math.floor(m/3);start=new Date(y,q*3,1);end=new Date(y,q*3+3,0)}else if(type==='CALENDAR_YEAR'){start=new Date(y,0,1);end=new Date(y,11,31)}else if(type==='MEMBERSHIP_YEAR'){if(!c||!c.renewalDate)return ['',''];const next=nextRenewalDate(c);if(!next)return ['',''];const nm=next.match(/^(\d{4})-(\d{2})-(\d{2})$/);const nextD=new Date(Number(nm[1]),Number(nm[2])-1,Number(nm[3]));const startD=new Date(nextD);startD.setFullYear(startD.getFullYear()-1);const endD=new Date(nextD);endD.setDate(endD.getDate()-1);start=startD;end=endD}else{start=new Date(y,m,1);end=new Date(y,m+1,0)}return [ymd(start),ymd(end)]}
 function spend(cardId,type){const c=state.cards.find(x=>x.id===cardId);let ms=state.milestones.filter(x=>x.cardId===cardId&&x.periodType===type);if(!ms.length)return 0;let [s,e]=periodRange(type,c);if(!s)return 0;return state.transactions.filter(t=>t.cardId===cardId&&t.type!=='PAYMENT'&&t.status!=='REFUNDED'&&t.date>=s&&t.date<=e).reduce((a,t)=>a+Number(t.amount),0)}
 function milestonePeriodLabel(type){return type==='MEMBERSHIP_YEAR'?'Fee waiver · membership year':type.replaceAll('_',' ')}
-function milestoneNote(c,m,v){if(m.periodType!=='MEMBERSHIP_YEAR')return '';const[s,e]=periodRange('MEMBERSHIP_YEAR',c);if(!s)return '';const target=Number(m.targetAmount);return v>=target?`🎉 Fee waived for the ${esc(displayDate(nextRenewalDate(c)))} renewal`:`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))} to waive next year's fee`}
+function milestoneNote(c,m,v){const[,e]=periodRange(m.periodType,c);if(!e)return '';const target=Number(m.targetAmount);if(m.periodType==='MEMBERSHIP_YEAR')return v>=target?`🎉 Fee waived for the ${esc(displayDate(nextRenewalDate(c)))} renewal`:`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))} to waive next year's fee`;return v>=target?'✓ Target reached':`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))}`}
 function paidForCurrentBill(c){return state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.status!=='REFUNDED'&&t.date>=(c.billDate||'0000-01-01')).reduce((a,t)=>a+Number(t.amount||0),0)}
 function status(c){
   const bill=Number(c.currentBill||0), paid=paidForCurrentBill(c);
@@ -648,5 +655,72 @@ const supportsDirectFileAccess='showOpenFilePicker'in window&&'showSaveFilePicke
 document.getElementById('openDataFile').onclick=()=>chooseDataFile(false);document.getElementById('createDataFile').onclick=()=>chooseDataFile(true);document.getElementById('resumeDataFile').onclick=reopenLastDataFile;document.getElementById('importDataFile').onclick=()=>document.getElementById('dataFileInput').click();document.getElementById('dataFileInput').onchange=e=>{const file=e.target.files[0];if(file)importDataFile(file);e.target.value=''};document.getElementById('exportDataFile').onclick=exportMobileData;
 if(supportsDirectFileAccess){getRememberedFileHandle().then(async handle=>{if(!handle)return;const permission=await handle.queryPermission({mode:'readwrite'});if(permission==='granted')await useDataFile(handle);else document.getElementById('resumeDataFile').hidden=false}).catch(()=>{})}else{document.getElementById('dataGateTitle').textContent='Import your Cardly data';document.getElementById('dataGateDescription').textContent='Choose cardly-data.json from the Files app. Cardly will keep your changes on this iPhone until you export an updated file back to iCloud Drive.';document.getElementById('openDataFile').hidden=true;document.getElementById('createDataFile').hidden=true;document.getElementById('importDataFile').hidden=false;getMobileData().then(async data=>{if(!data)return;mobileStorage=true;applyData(data);await load();showDashboard()}).catch(()=>setFileError('Could not open this browser’s saved Cardly data.'))}
 
+(function(){
+  const indicator=document.getElementById('pullRefresh');
+  if(!indicator)return;
+  const THRESHOLD=70,MAX=120;
+  let startY=0,pulling=false,refreshing=false;
+  document.addEventListener('touchstart',e=>{
+    if(refreshing||window.scrollY>0)return;
+    startY=e.touches[0].clientY;pulling=true;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!pulling||refreshing)return;
+    const dy=e.touches[0].clientY-startY;
+    if(dy<=0){indicator.style.transform='translateY(-50px)';return}
+    const pull=Math.min(dy,MAX);
+    indicator.style.transform=`translateY(${pull-50}px)`;
+    indicator.textContent=pull>=THRESHOLD?'↻ Release to refresh':'↓ Pull to refresh';
+  },{passive:true});
+  document.addEventListener('touchend',()=>{
+    if(!pulling||refreshing){pulling=false;return}
+    pulling=false;
+    const m=indicator.style.transform.match(/translateY\(([-\d.]+)px\)/);
+    const pull=m?Number(m[1])+50:0;
+    if(pull>=THRESHOLD){
+      refreshing=true;
+      indicator.textContent='Refreshing…';
+      indicator.style.transform='translateY(0px)';
+      setTimeout(()=>{location.replace(location.pathname+'?r='+Date.now())},250);
+    }else{
+      indicator.style.transform='translateY(-50px)';
+    }
+  },{passive:true});
+})();
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  let reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloading)return;reloading=true;window.location.reload()});
+}
+(function(){
+  const el=document.getElementById('pullRefresh');
+  const THRESHOLD=70,MAXPULL=110;
+  let startY=null,pulling=false;
+  document.addEventListener('touchstart',e=>{
+    if(window.scrollY>0||e.touches.length!==1)return;
+    startY=e.touches[0].clientY;pulling=true;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!pulling||startY===null)return;
+    const dy=e.touches[0].clientY-startY;
+    if(dy<=0){el.style.height='0px';el.classList.remove('spin');return}
+    const h=Math.min(MAXPULL,dy*0.5);
+    el.style.height=h+'px';
+    el.querySelector('span').textContent=h>=THRESHOLD?'↻ Release to refresh':'↓ Pull to refresh';
+  },{passive:true});
+  document.addEventListener('touchend',()=>{
+    if(!pulling)return;
+    const h=parseFloat(el.style.height||'0');
+    if(h>=THRESHOLD){
+      el.classList.add('spin');el.querySelector('span').textContent='↻ Refreshing…';el.style.height='50px';
+      if('caches' in window){caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).finally(()=>window.location.reload())}
+      else window.location.reload();
+    }else{
+      el.style.height='0px';
+    }
+    pulling=false;startY=null;
+  },{passive:true});
+})();
 </script>
 </body></html>
