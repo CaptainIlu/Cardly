@@ -33,6 +33,7 @@
 .attgroup{margin-bottom:22px}.attrows{overflow:hidden}.attrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}.attrow:last-child{border-bottom:0}.attmain{flex:1;min-width:0}.attrow .btn{flex:none}
 .bankhead{margin:14px 0 0;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.bankhead:first-child{margin-top:0}.bankhead span{font-weight:500}
 .bankgrid{display:flex;flex-wrap:wrap;gap:8px;padding:14px}.bankchip{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;font-size:13px}.bankchip .bc{color:var(--muted);font-size:12px;margin-left:2px}.chipbtn{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:999px;line-height:1}.chipbtn:hover{color:var(--accent)}.msbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:24px;margin-bottom:14px;padding-top:14px;border-top:1px solid var(--line)}
+.addbtn{font-size:18px;line-height:1;font-weight:700;padding:8px 16px}
 #pullRefresh{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:center;height:0;overflow:hidden;color:var(--accent);font-size:13px;font-weight:700;background:var(--bg);z-index:999;transition:height .15s}
 #pullRefresh span{display:inline-block}
 #pullRefresh.spin span{animation:pr-spin 0.8s linear infinite}
@@ -82,12 +83,12 @@
     </div>
 
     <div class="tabpane" id="tab-cards" hidden>
-      <div class="toolbar"><input class="search" id="search" placeholder="Search cards..."><select id="statusFilter"><option value="all">All status</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select><button class="btn primary" id="addCard">+ Add Card</button></div>
+      <div class="toolbar"><input class="search" id="search" placeholder="Search cards..."><select id="statusFilter"><option value="all">All status</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select><button class="btn primary addbtn" id="addCard" title="Add card" aria-label="Add card">+</button></div>
       <div id="cards" class="list"></div>
     </div>
 
     <div class="tabpane" id="tab-transactions" hidden>
-      <div class="sectionhead"><div><div class="sectiontitle">Transactions</div><div class="muted" id="txnFySummary"></div></div><button class="btn primary" id="addTxn">+ Add Transaction</button></div>
+      <div class="sectionhead"><div><div class="sectiontitle">Transactions</div><div class="muted" id="txnFySummary"></div></div><button class="btn primary addbtn" id="addTxn" title="Add transaction" aria-label="Add transaction">+</button></div>
       <div class="toolbar"><input class="search" id="txnSearch" placeholder="Search merchant..."></div>
       <div class="chips" id="txnCardChips"></div>
       <div id="transactions"></div>
