@@ -121,8 +121,9 @@
 <dialog id="cardDialog"><div class="modal"><div class="modalhead"><h2 id="cardDialogTitle">Add credit card</h2><button class="iconbtn" onclick="cardDialog.close()">×</button></div>
 <form id="cardForm" class="form">
 <div class="formrow"><div class="field"><label class="label">Bank</label><select name="bank" id="cardBank" required></select><input name="newBank" id="cardNewBank" placeholder="New bank name" style="margin-top:8px" hidden></div><div class="field"><label class="label">Card name</label><input name="name" required></div></div>
+<div class="field"><label class="label">Card type</label><select id="cardIsDebit" name="cardTypeSelect"><option value="CREDIT">Credit</option><option value="DEBIT">Debit (no bill tracking)</option></select></div>
 <div class="formrow"><div class="field"><label class="label">Network</label><select name="network"><option>Visa</option><option>Mastercard</option><option>Amex</option><option>RuPay</option></select></div><div class="field"><label class="label">Last 4 digits</label><input name="last4" maxlength="4" inputmode="numeric"></div></div>
-<div class="formrow"><div class="field"><label class="label">Statement day</label><input name="statementDay" type="number" min="1" max="31" required></div><div class="field"><label class="label">Due day</label><input name="dueDay" type="number" min="1" max="31" required></div></div>
+<div class="formrow" id="cardBillingRow"><div class="field"><label class="label">Statement day</label><input id="cardStatementDay" name="statementDay" type="number" min="1" max="31" required></div><div class="field"><label class="label">Due day</label><input id="cardDueDay" name="dueDay" type="number" min="1" max="31" required></div></div>
 <div class="field"><label class="label">Rewards rate (%)</label><input name="rewardRatePct" type="number" min="0" step="0.01" value="0"></div>
 <div class="field"><label class="checkfield"><input type="checkbox" id="cardLifetimeFree" name="lifetimeFree"> Lifetime free (no annual fee)</label></div>
 <div id="feeDetailsGroup">
@@ -131,7 +132,7 @@
 <div class="meta">Just the day and month it renews on — Cardly works out the year and rolls it forward automatically. If a waiver spend is set, Cardly tracks it for you against this card's membership year.</div>
 </div>
 <div id="cardCreateOnly">
-<div class="formrow"><div class="field"><label class="label">Current bill</label><input name="currentBill" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Bill date</label><input name="billDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}"></div></div>
+<div class="formrow" id="cardBillAmountRow"><div class="field"><label class="label">Current bill</label><input name="currentBill" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Bill date</label><input name="billDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}"></div></div>
 <div><div class="sectionhead"><div class="sectiontitle">Milestones</div><button type="button" class="btn" id="addMilestone">+ Add</button></div><div id="milestoneInputs"></div></div>
 </div>
 <div class="modalfoot"><button type="button" class="btn" onclick="cardDialog.close()">Cancel</button><button class="btn primary" id="saveCard">Save Card</button></div>
@@ -232,7 +233,7 @@ function outstanding(c){return Math.max(0,Number(c.currentBill||0)-paidForCurren
 function fyRange(){const t=today(),y=Number(t.slice(0,4)),m=Number(t.slice(5,7)),s=m>=4?y:y-1;return {start:`${s}-04-01`,end:`${s+1}-03-31`,label:`FY ${s}-${String(s+1).slice(2)}`}}
 function aisSummary(){
   const fy=fyRange(),groups=new Map();
-  state.cards.forEach(c=>{const bankId=c.bankId;if(!bankId)return;if(!groups.has(bankId))groups.set(bankId,{bankId,bankName:bankName(bankId),perCard:[],total:0});const paid=state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.date>=fy.start&&t.date<=fy.end).reduce((a,t)=>a+Number(t.amount),0);const g=groups.get(bankId);g.perCard.push({card:c,paid});g.total+=paid});
+  state.cards.forEach(c=>{if(c.cardType==='DEBIT')return;const bankId=c.bankId;if(!bankId)return;if(!groups.has(bankId))groups.set(bankId,{bankId,bankName:bankName(bankId),perCard:[],total:0});const paid=state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.date>=fy.start&&t.date<=fy.end).reduce((a,t)=>a+Number(t.amount),0);const g=groups.get(bankId);g.perCard.push({card:c,paid});g.total+=paid});
   return [...groups.values()].filter(g=>g.total>0||g.perCard.some(x=>x.card.active!==false)).map(g=>{g.pct=g.total/aisLimit()*100;g.level=g.pct>=100?'crossed':g.pct>=aisWarnPct()?'warn':'ok';return g}).sort((a,b)=>b.total-a.total);
 }
 function aisForCard(c){return aisSummary().find(g=>g.bankId===c.bankId)}
@@ -271,12 +272,12 @@ function milestoneSort(){const v=localStorage.getItem('cardly-ms-sort');return M
 function milestoneCount(){const v=localStorage.getItem('cardly-ms-count');return v==='all'||['10','20','50'].includes(v)?v:'10'}
 function renderHome(){
   msSort.value=milestoneSort();msCount.value=milestoneCount();
-  const active=state.cards.filter(c=>c.active!==false),unpaidAll=state.cards.filter(c=>status(c)!=='paid');
+  const active=state.cards.filter(c=>c.active!==false),unpaidAll=state.cards.filter(c=>c.cardType!=='DEBIT'&&status(c)!=='paid');
   document.getElementById('cardCount').textContent=active.length;
   document.getElementById('unpaidCount').textContent=unpaidAll.length;
   document.getElementById('dueTotal').textContent=money(unpaidAll.reduce((a,c)=>a+outstanding(c),0));
-  const unpaid=active.filter(c=>status(c)!=='paid').map(c=>({c,d:daysUntil(dueDate(c))})).sort((a,b)=>(a.d===null?9999:a.d)-(b.d===null?9999:b.d));
-  const billUpdates=active.filter(needsBillUpdate);
+  const unpaid=active.filter(c=>c.cardType!=='DEBIT'&&status(c)!=='paid').map(c=>({c,d:daysUntil(dueDate(c))})).sort((a,b)=>(a.d===null?9999:a.d)-(b.d===null?9999:b.d));
+  const billUpdates=active.filter(c=>c.cardType!=='DEBIT'&&needsBillUpdate(c));
   const msAll=allMilestones().sort(MS_SORTS[milestoneSort()]);
   const msN=milestoneCount(),ms=msN==='all'?msAll:msAll.slice(0,Number(msN));
   const msUrgent=allMilestones().filter(x=>!x.achieved&&x.left<=milestoneSoonDays()).sort(MS_SORTS.pace);
@@ -294,8 +295,12 @@ function renderHome(){
   document.getElementById('homeAttention').innerHTML=out?`<div class="sectionhead"><div class="sectiontitle">Needs attention</div></div>${out}`:'<div class="panel empty">All clear — nothing needs your attention right now.</div>';
 }
 function cardRowHtml(c){
+  const isDebit=c.cardType==='DEBIT';
   const st=status(c),due=dueDate(c),cms=state.milestones.filter(m=>m.cardId===c.id&&m.active!==false),feeBadge=c.lifetimeFree?'<span class="badge">LTF</span>':(feeDueSoon(c)?`<span class="badge warn">Fee in ${daysUntil(nextRenewalDate(c))}d</span>`:'');
-  return `<div class="panel cardrow clickable" onclick="openCard('${c.id}')"><div class="cardmain"><div><div class="cardname">${esc(c.name)}</div><div class="meta">${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''} · Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(due))}</div></div><div class="badges"><span class="badge ${st}">${st.toUpperCase()}</span>${feeBadge}</div></div><div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>${cms.length?`<div class="card-milestones"><div class="milestone-label">Milestones</div>${cms.map(m=>{const v=spend(m.cardId,m.periodType),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone"><div class="milestonehead"><span>${esc(m.name)} · ${money(v)} / ${money(m.targetAmount)}</span><span>${Math.round(p)}%</span></div><div class="bar"><div class="fill" style="width:${p}%"></div></div>${note?`<div class="meta">${note}</div>`:''}</div>`}).join('')}</div>`:''}</div>`;
+  const metaLine=isDebit?`${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''}`:`${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''} · Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(due))}`;
+  const badges=isDebit?`<span class="badge">DEBIT</span>${feeBadge}`:`<span class="badge ${st}">${st.toUpperCase()}</span>${feeBadge}`;
+  const billLine=isDebit?'':`<div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>`;
+  return `<div class="panel cardrow clickable" onclick="openCard('${c.id}')"><div class="cardmain"><div><div class="cardname">${esc(c.name)}</div><div class="meta">${metaLine}</div></div><div class="badges">${badges}</div></div>${billLine}${cms.length?`<div class="card-milestones"><div class="milestone-label">Milestones</div>${cms.map(m=>{const v=spend(m.cardId,m.periodType),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone"><div class="milestonehead"><span>${esc(m.name)} · ${money(v)} / ${money(m.targetAmount)}</span><span>${Math.round(p)}%</span></div><div class="bar"><div class="fill" style="width:${p}%"></div></div>${note?`<div class="meta">${note}</div>`:''}</div>`}).join('')}</div>`:''}</div>`;
 }
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase(),f=document.getElementById('statusFilter').value;
@@ -502,7 +507,14 @@ cardLifetimeFree.onchange=()=>{feeDetailsGroup.hidden=cardLifetimeFree.checked};
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 function milestoneRow(){const d=document.createElement('div');d.className='milestone-edit';d.innerHTML=`<div class="formrow"><input class="mname" placeholder="Name (e.g. Monthly)" required><select class="mtype"><option value="CALENDAR_MONTH">Calendar Month</option><option value="BILLING_CYCLE">Billing Cycle</option><option value="CALENDAR_QUARTER">Calendar Quarter</option><option value="CALENDAR_YEAR">Calendar Year</option><option value="MEMBERSHIP_YEAR">Membership Year (fee waiver)</option></select></div><div style="margin-top:8px"><input class="mtarget" type="number" min="1" step="1" placeholder="Target spend" required></div>`;document.getElementById('milestoneInputs').appendChild(d)}
 addMilestone.onclick=milestoneRow;
-addCard.onclick=()=>{cardForm.reset();cardForm.dataset.cardId='';cardDialogTitle.textContent='Add credit card';cardCreateOnly.hidden=false;saveCard.textContent='Save Card';milestoneInputs.innerHTML='';populateBankSelect('');cardLifetimeFree.checked=false;feeDetailsGroup.hidden=false;cardDialog.showModal()}
+function applyCardTypeVisibility(){
+  const isDebit=cardIsDebit.value==='DEBIT';
+  cardBillingRow.hidden=isDebit;
+  cardStatementDay.required=!isDebit;cardDueDay.required=!isDebit;
+  const billRow=document.getElementById('cardBillAmountRow');if(billRow)billRow.hidden=isDebit;
+}
+cardIsDebit.onchange=applyCardTypeVisibility;
+addCard.onclick=()=>{cardForm.reset();cardForm.dataset.cardId='';cardDialogTitle.textContent='Add credit card';cardCreateOnly.hidden=false;saveCard.textContent='Save Card';milestoneInputs.innerHTML='';populateBankSelect('');cardLifetimeFree.checked=false;feeDetailsGroup.hidden=false;cardIsDebit.value='CREDIT';applyCardTypeVisibility();cardDialog.showModal()}
 function openEditCard(cardId){
   const c=state.cards.find(x=>x.id===cardId);if(!c)return;
   cardForm.reset();milestoneInputs.innerHTML='';
@@ -523,6 +535,8 @@ function openEditCard(cardId){
   const existingAuto=state.milestones.find(x=>x.cardId===c.id&&x.periodType==='MEMBERSHIP_YEAR'&&x.autoFeeWaiver);
   cardWaiverAmount.value=existingAuto?Number(existingAuto.targetAmount):'';
   feeDetailsGroup.hidden=cardLifetimeFree.checked;
+  cardIsDebit.value=c.cardType==='DEBIT'?'DEBIT':'CREDIT';
+  applyCardTypeVisibility();
   cardDialog.showModal();
 }
 editCardBtn.onclick=()=>{const cardId=detailDialog.dataset.cardId;detailDialog.close();openEditCard(cardId)};
@@ -534,10 +548,10 @@ function openCard(cardId){
   const ms=state.milestones.filter(m=>m.cardId===cardId);
   const ts=[...state.transactions].filter(t=>t.cardId===cardId).sort((a,b)=>b.date.localeCompare(a.date));
   detailTitle.innerHTML=`<span class="bnrow" style="display:inline-flex">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}</span></span>`;
-  const st=status(c);
+  const st=status(c),isDebit=c.cardType==='DEBIT';
   detailContent.innerHTML=`
-    <div class="sub">${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''}</div>
-    <div class="detail-grid" style="margin-top:14px">
+    <div class="sub">${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''}${isDebit?' · Debit card':''}</div>
+    ${isDebit?'':`<div class="detail-grid" style="margin-top:14px">
       <div class="detail-box"><div class="label">Current bill</div><strong>${money(c.currentBill)}</strong></div>
       <div class="detail-box"><div class="label">Paid</div><strong>${money(paidForCurrentBill(c))}</strong></div>
       <div class="detail-box"><div class="label">Outstanding</div><strong>${money(outstanding(c))}</strong></div>
@@ -545,7 +559,7 @@ function openCard(cardId){
     <div class="detail-section panel cardrow">
       <div class="cardmain"><div><div class="cardname">Payment status</div><div class="meta">Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(dueDate(c)))}</div></div><span class="badge ${st}">${st.toUpperCase()}</span></div>
       <div class="modalfoot payment-actions" style="margin-top:12px"><button class="btn" onclick="openBill('${c.id}')">Update Bill</button><button class="btn" onclick="openPayment('${c.id}')">+ Add Payment</button>${st==='paid'?'<button class="btn" disabled>✓ Bill Paid</button>':`<button class="btn primary" onclick="openPayment('${c.id}',true)">Mark Bill Paid</button>`}</div>
-    </div>
+    </div>`}
     <div class="detail-section panel cardrow">
       <div class="cardmain"><div><div class="cardname">Annual fee</div><div class="meta">${c.lifetimeFree?'Lifetime free — no annual fee':(c.renewalDate?`Fee ${money(c.annualFee)} · renews ${esc(displayDate(nextRenewalDate(c)))} (in ${daysUntil(nextRenewalDate(c))} day${daysUntil(nextRenewalDate(c))===1?'':'s'})`:'Not set yet')}</div></div></div>
     </div>
@@ -612,16 +626,16 @@ milestoneForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementB
 cardForm.onsubmit=async e=>{
   e.preventDefault();const b=document.getElementById('saveCard');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';
   try{
-    const f=new FormData(e.target),editingId=cardForm.dataset.cardId,fee=readFeeFields(f),bankId=bankFromForm(f);
+    const f=new FormData(e.target),editingId=cardForm.dataset.cardId,fee=readFeeFields(f),bankId=bankFromForm(f),cardType=f.get('cardTypeSelect')==='DEBIT'?'DEBIT':'CREDIT';
     if(editingId){
       const c=state.cards.find(x=>x.id===editingId);if(!c)throw new Error('Card not found.');
-      c.bankId=bankId;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.statementDay=Number(f.get('statementDay'));c.dueDay=Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);
+      c.bankId=bankId;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.cardType=cardType;c.statementDay=cardType==='DEBIT'?0:Number(f.get('statementDay'));c.dueDay=cardType==='DEBIT'?0:Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);
       c.lifetimeFree=fee.lifetimeFree;c.annualFee=fee.annualFee;c.renewalDate=fee.renewalDate;
       await put('cards',c);
       await syncFeeWaiverMilestone(c,fee.waiverAmt);
       cardDialog.close();await load();toast('✓ Card updated');openCard(c.id);
     }else{
-      const card={id:id(),bankId:bankId,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),statementDay:Number(f.get('statementDay')),dueDay:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),currentBill:Number(f.get('currentBill')||0),billDate:f.get('billDate')?dateForStorage(f.get('billDate')):today(),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
+      const card={id:id(),bankId:bankId,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),cardType,statementDay:cardType==='DEBIT'?0:Number(f.get('statementDay')),dueDay:cardType==='DEBIT'?0:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),currentBill:cardType==='DEBIT'?0:Number(f.get('currentBill')||0),billDate:cardType==='DEBIT'?'':(f.get('billDate')?dateForStorage(f.get('billDate')):today()),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
       await put('cards',card);
       await syncFeeWaiverMilestone(card,fee.waiverAmt);
       for(const r of document.querySelectorAll('.milestone-edit'))await put('milestones',{id:id(),cardId:card.id,name:r.querySelector('.mname').value,periodType:r.querySelector('.mtype').value,targetAmount:Number(r.querySelector('.mtarget').value),active:true});
