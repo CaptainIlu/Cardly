@@ -127,12 +127,12 @@
 <div class="field"><label class="label">Rewards rate (%)</label><input name="rewardRatePct" type="number" min="0" step="0.01" value="0"></div>
 <div class="field"><label class="checkfield"><input type="checkbox" id="cardLifetimeFree" name="lifetimeFree"> Lifetime free (no annual fee)</label></div>
 <div id="feeDetailsGroup">
-<div class="formrow"><div class="field"><label class="label">Annual fee</label><input id="cardAnnualFee" name="annualFee" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Renewal date (day-month)</label><input id="cardRenewalDate" name="renewalDate" class="dm-input" type="text" inputmode="numeric" placeholder="DD-MM" maxlength="5" pattern="[0-9]{2}-[0-9]{2}"></div></div>
+<div class="formrow"><div class="field"><label class="label">Annual fee</label><input id="cardAnnualFee" name="annualFee" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Renewal date (day-month)</label><input id="cardRenewalDate" name="renewalDate" type="date"></div></div>
 <div class="field"><label class="label">Spend to waive next year's fee (optional)</label><input id="cardWaiverAmount" name="waiverAmount" type="number" min="0" step="1" placeholder="e.g. 200000"></div>
 <div class="meta">Just the day and month it renews on — Cardly works out the year and rolls it forward automatically. If a waiver spend is set, Cardly tracks it for you against this card's membership year.</div>
 </div>
 <div id="cardCreateOnly">
-<div class="formrow" id="cardBillAmountRow"><div class="field"><label class="label">Current bill</label><input name="currentBill" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Bill date</label><input name="billDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}"></div></div>
+<div class="formrow" id="cardBillAmountRow"><div class="field"><label class="label">Current bill</label><input name="currentBill" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Bill date</label><input name="billDate" type="date"></div></div>
 <div><div class="sectionhead"><div class="sectiontitle">Milestones</div><button type="button" class="btn" id="addMilestone">+ Add</button></div><div id="milestoneInputs"></div></div>
 </div>
 <div class="modalfoot"><button type="button" class="btn" onclick="cardDialog.close()">Cancel</button><button class="btn primary" id="saveCard">Save Card</button></div>
@@ -150,7 +150,7 @@
 <dialog id="billDialog"><div class="modal"><div class="modalhead"><h2>Update current bill</h2><button class="iconbtn" onclick="billDialog.close()">×</button></div>
 <form id="billForm" class="form">
 <div id="billSummary" class="panel cardrow"></div>
-<div class="formrow"><div class="field"><label class="label">Bill amount</label><input id="billAmount" name="bill" type="number" min="0" step="0.01" required></div><div class="field"><label class="label">Bill date</label><input name="billDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}" required></div></div>
+<div class="formrow"><div class="field"><label class="label">Bill amount</label><input id="billAmount" name="bill" type="number" min="0" step="0.01" required></div><div class="field"><label class="label">Bill date</label><input name="billDate" type="date" required></div></div>
 <div class="field"><label class="checkfield"><input type="checkbox" id="billNotDue"> No bill this cycle (nothing was charged)</label></div>
 <div class="meta">Changing the bill date starts a new current-bill period. Older payment transactions remain in the history but won't reduce this bill.</div>
 <div class="modalfoot"><button type="button" class="btn" onclick="billDialog.close()">Cancel</button><button class="btn primary" id="saveBill">Save Bill</button></div>
@@ -159,7 +159,7 @@
 <dialog id="paymentDialog"><div class="modal"><div class="modalhead"><h2>Add bill payment</h2><button class="iconbtn" onclick="paymentDialog.close()">×</button></div>
 <form id="paymentForm" class="form">
 <div id="paymentSummary" class="panel cardrow"></div>
-<div class="formrow"><div class="field"><label class="label">Amount paid</label><input id="paymentAmount" name="amount" type="number" min="0.01" step="0.01" required></div><div class="field"><label class="label">Payment date</label><input name="paymentDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}" required></div></div>
+<div class="formrow"><div class="field"><label class="label">Amount paid</label><input id="paymentAmount" name="amount" type="number" min="0.01" step="0.01" required></div><div class="field"><label class="label">Payment date</label><input name="paymentDate" type="date" required></div></div>
 <div class="modalfoot"><button type="button" class="btn" onclick="paymentDialog.close()">Cancel</button><button class="btn primary" id="savePayment">Add Payment</button></div>
 </form></div></dialog>
 
@@ -169,7 +169,7 @@
 <dialog id="txnDialog"><div class="modal"><div class="modalhead"><h2 id="txnDialogTitle">Add transaction</h2><button class="iconbtn" onclick="txnDialog.close()">×</button></div>
 <form id="txnForm" class="form">
 <div class="field"><label class="label">Card</label><select name="cardId" id="txnCard" required></select></div>
-<div class="formrow"><div class="field"><label class="label">Date</label><input name="date" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}" required></div><div class="field"><label class="label">Amount</label><input name="amount" type="number" min="0.01" step="0.01" required></div></div>
+<div class="formrow"><div class="field"><label class="label">Date</label><input name="date" type="date" required></div><div class="field"><label class="label">Amount</label><input name="amount" type="number" min="0.01" step="0.01" required></div></div>
 <div class="field"><label class="label">Merchant</label><input name="merchant" required></div>
 <div class="modalfoot"><button type="button" class="btn" onclick="txnDialog.close()">Cancel</button><button class="btn primary" id="saveTxn">Add Transaction</button></div>
 </form></div></dialog>
@@ -177,7 +177,7 @@
 <dialog id="refundDialog"><div class="modal"><div class="modalhead"><h2 id="refundTitle">Mark as refunded</h2><button class="iconbtn" onclick="refundDialog.close()">×</button></div>
 <form id="refundForm" class="form">
 <div id="refundSummary" class="panel cardrow"></div>
-<div class="field"><label class="label">Refund date</label><input name="refundDate" class="date-input" type="text" inputmode="numeric" placeholder="DD-MM-YYYY" maxlength="10" pattern="[0-9]{2}-[0-9]{2}-[0-9]{4}" required></div>
+<div class="field"><label class="label">Refund date</label><input name="refundDate" type="date" required></div>
 <div class="modalfoot"><button type="button" class="btn" onclick="refundDialog.close()">Cancel</button><button class="btn primary" id="saveRefund">Mark Refunded</button></div>
 </form></div></dialog>
 
@@ -195,10 +195,9 @@ const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',ma
 function ymd(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 const today=()=>ymd(new Date());
 function displayDate(value){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}-${m[2]}-${m[1]}`:(value||'—')}
-function dateForStorage(value){const m=String(value||'').trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);if(!m)throw new Error('Enter the date as DD-MM-YYYY.');const day=Number(m[1]),month=Number(m[2]),year=Number(m[3]),date=new Date(year,month-1,day);if(date.getFullYear()!==year||date.getMonth()!==month-1||date.getDate()!==day)throw new Error('Enter a valid date as DD-MM-YYYY.');return `${m[3]}-${m[2]}-${m[1]}`}
-function displayDayMonth(value){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}-${m[2]}`:''}
-function dateForStorageFromDayMonth(value){const m=String(value||'').trim().match(/^(\d{2})-(\d{2})$/);if(!m)throw new Error('Enter the renewal date as DD-MM.');const day=Number(m[1]),month=Number(m[2]),t=today(),thisYear=Number(t.slice(0,4));const build=year=>{const d=new Date(year,month-1,day);if(d.getFullYear()!==year||d.getMonth()!==month-1||d.getDate()!==day)return null;return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`};for(let y=thisYear;y<=thisYear+8;y++){const candidate=build(y);if(candidate&&candidate>=t)return candidate}throw new Error('Enter a valid date as DD-MM.')}
-function setDateField(field,value){field.value=displayDate(value)}
+function dateForStorage(value){const v=String(value||'').trim();if(!/^\d{4}-\d{2}-\d{2}$/.test(v))throw new Error('Pick a date.');return v}
+function dateForStorageFromDayMonth(value){const m=String(value||'').trim().match(/^\d{4}-(\d{2})-(\d{2})$/);if(!m)throw new Error('Pick a renewal date.');const month=Number(m[1]),day=Number(m[2]),t=today(),thisYear=Number(t.slice(0,4));const build=year=>{const d=new Date(year,month-1,day);if(d.getFullYear()!==year||d.getMonth()!==month-1||d.getDate()!==day)return null;return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`};for(let y=thisYear;y<=thisYear+8;y++){const candidate=build(y);if(candidate&&candidate>=t)return candidate}throw new Error('Pick a valid renewal date.')}
+function setDateField(field,value){field.value=value||''}
 function effectiveBillDate(c){const latest=latestStatementDate(c),stored=String(c.billDate||'');return latest&&stored<latest?latest:(stored||latest)}
 function dueDate(c){const m=String(effectiveBillDate(c)||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return '';const billDay=Number(m[3]),dueDay=Number(c.dueDay||1),year=Number(m[1]),month=Number(m[2])-1,dueMonth=dueDay<=billDay?month+1:month,lastDay=new Date(year,dueMonth+1,0).getDate(),date=new Date(year,dueMonth,Math.min(dueDay,lastDay));return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 function dateForMonth(year,month,day){const lastDay=new Date(year,month+1,0).getDate(),date=new Date(year,month,Math.min(day,lastDay));return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
@@ -532,7 +531,7 @@ function openEditCard(cardId){
   cardForm.rewardRatePct.value=Number(c.rewardRatePct||0);
   cardLifetimeFree.checked=Boolean(c.lifetimeFree);
   cardAnnualFee.value=Number(c.annualFee||0);
-  cardRenewalDate.value=displayDayMonth(c.renewalDate);
+  cardRenewalDate.value=c.renewalDate||'';
   const existingAuto=state.milestones.find(x=>x.cardId===c.id&&x.periodType==='MEMBERSHIP_YEAR'&&x.autoFeeWaiver);
   cardWaiverAmount.value=existingAuto?Number(existingAuto.targetAmount):'';
   feeDetailsGroup.hidden=cardLifetimeFree.checked;
@@ -664,8 +663,6 @@ txnForm.onsubmit=async e=>{
 function openRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;refundForm.dataset.txnId=txnId;setDateField(refundForm.refundDate,t.refundDate||today());const c=state.cards.find(x=>x.id===t.cardId);refundSummary.innerHTML=`<div class="cardmain"><div><div class="cardname">${esc(t.merchant)}</div><div class="meta">${esc(c?bankName(c.bankId):'Unknown bank')} · ${esc(c?.name||'Unknown card')} · ${esc(displayDate(t.date))}</div></div><strong>${money(t.amount)}</strong></div>`;refundDialog.showModal()}
 refundForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveRefund');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const t=state.transactions.find(x=>x.id===refundForm.dataset.txnId);if(!t)throw new Error('Transaction not found.');t.status='REFUNDED';t.refundDate=dateForStorage(refundForm.refundDate.value);await put('transactions',t);refundDialog.close();await load();toast('✓ Transaction marked refunded');if(detailDialog.open)openCard(t.cardId)}catch(err){toast('Could not mark refund: '+err.message)}finally{b.disabled=false;b.textContent='Mark Refunded'}};
 async function undoRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;t.status='COMPLETED';t.refundDate='';await put('transactions',t);await load();toast('✓ Refund removed');if(detailDialog.open)openCard(t.cardId)};
-document.querySelectorAll('.date-input').forEach(field=>field.addEventListener('input',()=>{const digits=field.value.replace(/\D/g,'').slice(0,8);field.value=digits.length>4?`${digits.slice(0,2)}-${digits.slice(2,4)}-${digits.slice(4)}`:digits.length>2?`${digits.slice(0,2)}-${digits.slice(2)}`:digits}));
-document.querySelectorAll('.dm-input').forEach(field=>field.addEventListener('input',()=>{const digits=field.value.replace(/\D/g,'').slice(0,4);field.value=digits.length>2?`${digits.slice(0,2)}-${digits.slice(2)}`:digits}));
 search.oninput=render;statusFilter.onchange=render;txnSearch.oninput=renderTransactions;msSort.onchange=()=>{localStorage.setItem('cardly-ms-sort',msSort.value);render()};msCount.onchange=()=>{localStorage.setItem('cardly-ms-count',msCount.value);render()};theme.onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cardly-theme',d.dataset.theme)};document.documentElement.dataset.theme=localStorage.getItem('cardly-theme')||'light';
 const supportsDirectFileAccess='showOpenFilePicker'in window&&'showSaveFilePicker'in window;
 document.getElementById('openDataFile').onclick=()=>chooseDataFile(false);document.getElementById('createDataFile').onclick=()=>chooseDataFile(true);document.getElementById('resumeDataFile').onclick=reopenLastDataFile;document.getElementById('importDataFile').onclick=()=>document.getElementById('dataFileInput').click();document.getElementById('dataFileInput').onchange=e=>{const file=e.target.files[0];if(file)importDataFile(file);e.target.value=''};document.getElementById('exportDataFile').onclick=exportMobileData;
