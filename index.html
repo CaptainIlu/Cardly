@@ -121,7 +121,7 @@
 <dialog id="cardDialog"><div class="modal"><div class="modalhead"><h2 id="cardDialogTitle">Add credit card</h2><button class="iconbtn" onclick="cardDialog.close()">×</button></div>
 <form id="cardForm" class="form">
 <div class="formrow"><div class="field"><label class="label">Bank</label><select name="bank" id="cardBank" required></select><input name="newBank" id="cardNewBank" placeholder="New bank name" style="margin-top:8px" hidden></div><div class="field"><label class="label">Card name</label><input name="name" required></div></div>
-<div class="field"><label class="label">Card type</label><select id="cardIsDebit" name="cardTypeSelect"><option value="CREDIT">Credit</option><option value="DEBIT">Debit (no bill tracking)</option></select></div>
+<div class="field"><label class="label">Card type</label><select id="cardIsDebit" name="cardTypeSelect"><option value="CREDIT">Credit</option><option value="DEBIT">Debit</option></select></div>
 <div class="formrow"><div class="field"><label class="label">Network</label><select name="network"><option>Visa</option><option>Mastercard</option><option>Amex</option><option>RuPay</option></select></div><div class="field"><label class="label">Last 4 digits</label><input name="last4" maxlength="4" inputmode="numeric"></div></div>
 <div class="formrow" id="cardBillingRow"><div class="field"><label class="label">Statement day</label><input id="cardStatementDay" name="statementDay" type="number" min="1" max="31" required></div><div class="field"><label class="label">Due day</label><input id="cardDueDay" name="dueDay" type="number" min="1" max="31" required></div></div>
 <div class="field"><label class="label">Rewards rate (%)</label><input name="rewardRatePct" type="number" min="0" step="0.01" value="0"></div>
