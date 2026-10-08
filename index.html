@@ -80,6 +80,7 @@
       <div id="homeAttention"></div>
       <div class="msbar"><span class="sectiontitle" style="font-size:14px">Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select><span class="spacer"></span><span class="sectiontitle" style="font-size:14px">Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></div>
       <div id="msSection"></div>
+      <div id="renewalSection"></div>
     </div>
 
     <div class="tabpane" id="tab-cards" hidden>
@@ -113,7 +114,7 @@
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Reminder thresholds</div><div class="muted">How many days ahead Cardly flags things on Home.</div></div></div>
       <div class="panel" style="padding:16px"><div class="formrow"><div class="field"><label class="label">Milestones ending within (days)</label><input id="milestoneSoonInput" type="number" min="1" step="1"></div><div class="field"><label class="label">Bill-update grace period (days)</label><input id="billGraceInput" type="number" min="0" step="1"></div></div>
-      <div class="field" style="margin-top:12px"><label class="label">Fee renewals coming up within (days)</label><input id="feeRenewalInput" type="number" min="1" step="1"></div></div>
+      <div class="formrow" style="margin-top:12px"><div class="field"><label class="label">Fee renewals coming up within (days)</label><input id="feeRenewalInput" type="number" min="1" step="1"></div><div class="field"><label class="label">Upcoming renewals list shows next (days)</label><input id="renewalListInput" type="number" min="1" step="1"></div></div></div>
     </section>
   </main>
 </div>
@@ -287,6 +288,8 @@ function renderHome(){
   if(unpaid.length)out+=attSection('Unpaid bills','Overdue first, then by due date.',unpaid.map(({c,d})=>{const late=d!==null&&d<0,soon=d!==null&&d<=DUE_REMINDER_DAYS;return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta"${late?' style="color:var(--bad)"':''}>${d===null?'Due date unknown':`${dueLabel(d)} · ${esc(displayDate(dueDate(c)))}`} · Outstanding ${money(outstanding(c))}</div>`,`<button class="btn${soon?' primary':''}" onclick="openPayment('${c.id}')">+ Add Payment</button>`)}));
   if(msUrgent.length)out+=attSection('Milestones ending soon',`Incomplete, with ${milestoneSoonDays()} day${milestoneSoonDays()===1?'':'s'} or less left.`,msUrgent.map(({m,c,v,target,left,end})=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)} — ${esc(m.name)}</span></div><div class="meta">${money(v)} of ${money(target)} · ${money(target-v)} to go · ${left===0?'ends today':`${left} day${left===1?'':'s'} left`} (${esc(displayDate(end))})</div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)));
   if(billUpdates.length)out+=attSection('Bill details needed',`Add the latest bill issued on or before ${esc(displayDate(today()))}.`,billUpdates.map(c=>{const sd=latestStatementDate(c);return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Statement date ${esc(displayDate(sd))} · not updated after two days</div>`,`<button class="btn primary" onclick="openBill('${c.id}','${sd}')">Add Bill Details</button>`)}));
+  const lookahead=renewalListDays(),upcoming=state.cards.filter(c=>c.active!==false&&!c.lifetimeFree&&c.renewalDate).map(c=>({c,rd:nextRenewalDate(c)})).map(x=>({...x,d:daysUntil(x.rd)})).filter(x=>x.d!==null&&x.d>=0&&x.d<=lookahead).sort((a,b)=>a.d-b.d);
+  document.getElementById('renewalSection').innerHTML=upcoming.length?attSection('Upcoming renewals',`Annual fees renewing in the next ${lookahead} day${lookahead===1?'':'s'}.`,upcoming.map(({c,rd,d})=>{const wm=state.milestones.find(m=>m.cardId===c.id&&m.periodType==='MEMBERSHIP_YEAR'&&m.active!==false);let waiver='';if(wm){const v=spend(c.id,'MEMBERSHIP_YEAR'),t=Number(wm.targetAmount);waiver=v>=t?' · fee waiver achieved ✓':` · ${money(Math.max(0,t-v))} more to waive`}return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Renews ${esc(displayDate(rd))} (${d===0?'today':`in ${d} day${d===1?'':'s'}`}) · Fee ${money(c.annualFee)}${waiver}</div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)})):'';
   document.getElementById('msSection').innerHTML=msAll.length?attSection('Milestones',`Showing ${ms.length} of ${msAll.length}.`,ms.map(({m,c,v,target,left,end,achieved})=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${achieved?'✓ ':''}${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)} — ${esc(m.name)}</span></div><div class="meta">${money(v)} of ${money(target)}${achieved?' · achieved':` · ${money(target-v)} to go`} · ${left===0?'ends today':`${left} day${left===1?'':'s'} left`} (${esc(displayDate(end))})${m.periodType==='MEMBERSHIP_YEAR'&&Number(c.annualFee)>0?` · waives ${money(c.annualFee)} fee`:''}</div><div class="bar" style="margin-top:8px"><div class="fill" style="width:${Math.min(100,v/target*100)}%"></div></div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`,achieved?'achieved':''))):'<div class="panel empty">No milestones configured on any card yet.</div>';
   if(fees.length)out+=attSection('Annual fee renewals coming up','Decide whether to keep the card before the fee posts.',fees.map(({c,rd})=>{const d=daysUntil(rd);return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Renews ${esc(displayDate(rd))} (in ${d} day${d===1?'':'s'}) · Fee ${money(c.annualFee)}</div>`,`<button class="btn" onclick="openCard('${c.id}')">Review</button>`)}));
   if(ais.length)out+=attSection('AIS reporting limit','Bill payments per bank this financial year.',ais.map(g=>attRow(`<div class="cardname bnrow">${bankTag(g.bankId)}<span>${esc(g.bankName)} · limit reached</span></div><div class="meta">${esc(aisMessage(g))}</div>`,`<button class="btn" onclick="setTab('ais')">View</button>`)));
@@ -417,6 +420,7 @@ function ensureSettings(){
   if(!(Number(s.milestoneSoonDays)>=1)){s.milestoneSoonDays=3;changed=true}
   if(!(Number(s.billGraceDays)>=0)){s.billGraceDays=2;changed=true}
   if(!(Number(s.feeRenewalDays)>=1)){s.feeRenewalDays=21;changed=true}
+  if(!(Number(s.renewalListDays)>=1)){s.renewalListDays=90;changed=true}
   return changed;
 }
 function ensureBanks(){
@@ -448,6 +452,7 @@ function aisWarnPct(){return Number(state.settings&&state.settings.aisWarnPct)||
 function milestoneSoonDays(){return Number(state.settings&&state.settings.milestoneSoonDays)||3}
 function billGraceDays(){const v=state.settings&&state.settings.billGraceDays;return Number.isFinite(Number(v))&&Number(v)>=0?Number(v):2}
 function feeRenewalDays(){return Number(state.settings&&state.settings.feeRenewalDays)||21}
+function renewalListDays(){return Number(state.settings&&state.settings.renewalListDays)||90}
 function bankIndexByName(name){const k=String(name||'').trim().toLowerCase();return state.banks.findIndex(b=>b.name.trim().toLowerCase()===k)}
 function addBankEntity(name){name=String(name||'').trim();if(!name)return null;const i=bankIndexByName(name);if(i>=0)return state.banks[i];const b={id:id(),name,logoUrl:DEFAULT_BANK_LOGOS[name]||''};state.banks.push(b);state.banks.sort((a,b2)=>a.name.localeCompare(b2.name));return b}
 function populateBankSelect(selectedId=''){
@@ -463,7 +468,7 @@ function renderSettings(){
   const counts=new Map();state.cards.forEach(c=>{if(c.bankId)counts.set(c.bankId,(counts.get(c.bankId)||0)+1)});
   const banks=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
   document.getElementById('bankList').innerHTML=banks.length?banks.map(b=>{const n=counts.get(b.id)||0;return `<span class="bankchip">${bankTag(b.id)}<span>${esc(b.name)}</span><span class="bc">${n}</span><button class="chipbtn" title="Set logo URL" onclick="editBankLogo('${b.id}')">🖼</button><button class="chipbtn" title="Rename" onclick="renameBank('${b.id}')">✎</button>${n?'':`<button class="chipbtn" title="Remove (no cards use it)" onclick="removeBank('${b.id}')">✕</button>`}</span>`}).join(''):'<span class="muted">No banks yet. Add one below.</span>';
-  aisLimitInput.value=aisLimit();aisWarnInput.value=aisWarnPct();milestoneSoonInput.value=milestoneSoonDays();billGraceInput.value=billGraceDays();feeRenewalInput.value=feeRenewalDays();
+  aisLimitInput.value=aisLimit();aisWarnInput.value=aisWarnPct();milestoneSoonInput.value=milestoneSoonDays();billGraceInput.value=billGraceDays();feeRenewalInput.value=feeRenewalDays();renewalListInput.value=renewalListDays();
 }
 async function commitSettings(msg){try{await saveDataFile();renderSettings();if(msg)toast(msg)}catch(err){toast('Could not save settings: '+err.message)}}
 async function addBankFromSetting(name){const n=String(name||'').trim();if(!n)return;if(bankIndexByName(n)>=0){toast('That bank is already in the list.');return}addBankEntity(n);await commitSettings('✓ Bank added')}
@@ -478,6 +483,7 @@ aisLimitInput.onchange=async()=>{const v=Number(aisLimitInput.value);if(!(v>0)){
 aisWarnInput.onchange=async()=>{const v=Number(aisWarnInput.value);if(!(v>=1&&v<=100)){toast('Enter a percentage between 1 and 100.');renderSettings();return}state.settings.aisWarnPct=v;await commitSettings('✓ Warning level saved')};
 milestoneSoonInput.onchange=async()=>{const v=Math.round(Number(milestoneSoonInput.value));if(!(v>=1)){toast('Enter a number of days, 1 or more.');renderSettings();return}state.settings.milestoneSoonDays=v;await commitSettings('✓ Saved')};
 billGraceInput.onchange=async()=>{const v=Math.round(Number(billGraceInput.value));if(!(v>=0)){toast('Enter 0 or more days.');renderSettings();return}state.settings.billGraceDays=v;await commitSettings('✓ Saved')};
+renewalListInput.onchange=async()=>{const v=Math.round(Number(renewalListInput.value));if(!(v>=1)){toast('Enter a number of days, 1 or more.');renderSettings();return}state.settings.renewalListDays=v;await commitSettings('✓ Saved')};
 feeRenewalInput.onchange=async()=>{const v=Math.round(Number(feeRenewalInput.value));if(!(v>=1)){toast('Enter a number of days, 1 or more.');renderSettings();return}state.settings.feeRenewalDays=v;await commitSettings('✓ Saved')};
 function readFeeFields(f){
   const ltf=f.get('lifetimeFree')==='on';
