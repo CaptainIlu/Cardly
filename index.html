@@ -45,7 +45,19 @@
 .bankhead.bnrow{align-items:center}.msbar select{padding:6px 10px;font-size:13px}.msbar .spacer{flex:1}.achieved{opacity:.7}.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}.filterchip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;white-space:nowrap}.filterchip:hover{border-color:var(--accent)}.filterchip.active{border-color:var(--accent);color:var(--accent)}.monthhead{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 8px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}.monthhead:first-child{margin-top:0}.monthhead span:last-child{color:var(--text);font-weight:600;text-transform:none;letter-spacing:0;font-size:13px}
     dialog{border:1px solid var(--line);border-radius:16px;padding:0;background:var(--panel);color:var(--text);width:min(560px,calc(100vw - 28px));box-shadow:0 20px 70px #0006}dialog::backdrop{background:#0008}.modal{padding:20px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.modal h2{font-size:20px;margin:0;letter-spacing:-.03em}.form{display:grid;gap:12px}.field{display:grid;gap:5px}.label{font-size:12px;color:var(--muted)}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modalfoot{display:flex;justify-content:end;gap:8px;margin-top:18px}.milestone-edit{border:1px solid var(--line);border-radius:12px;padding:12px}.toast{position:fixed;right:20px;bottom:20px;background:var(--accent);color:#21180f;padding:11px 14px;border-radius:10px;display:none;z-index:5;font-weight:650}.toast.show{display:block}
     @media(max-width:700px){.shell{padding:16px}.stat{padding:12px}.stat strong{font-size:18px}.attrow .btn{padding:7px 10px;font-size:13px}.hero{align-items:start;flex-direction:column}.grid2,.formrow{grid-template-columns:1fr}.bill-reminder{align-items:start;flex-direction:column}.top{margin-bottom:20px}}
-  </style>
+  
+/* UI polish */
+select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23817a72' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;height:40px;font-size:14px;cursor:pointer}
+.toolbar{align-items:center}.toolbar .search,.toolbar select{height:40px;box-sizing:border-box}.toolbar .search{border-radius:999px;padding-left:16px}.toolbar select{border-radius:999px;padding-left:14px}
+.msbar{display:flex;align-items:center;gap:10px;margin:0 0 14px}.msfield{display:flex;align-items:center;gap:8px;flex:1;min-width:0;margin:0;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:0 0 0 14px;height:40px}.msfield span{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.msfield select{flex:1;min-width:0;border:0;background-color:transparent;box-shadow:none;height:38px;padding:0 30px 0 0;font-weight:600;border-radius:0;text-overflow:ellipsis}.msfield:last-child{flex:0 0 auto}.msfield:last-child select{width:60px;flex:none}
+.sectiontitle{font-size:17px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}.sectiontitle::before{content:"";width:4px;height:18px;border-radius:2px;background:var(--accent);flex:none}.sectiontitle .muted{font-size:13px;font-weight:600}.sectionhead .muted:not(.sectiontitle .muted){font-size:13px}.sectionhead>div>.muted{margin:3px 0 0 14px}
+.attgroup .sectionhead{padding-bottom:8px;border-bottom:1px solid var(--line)}
+#homeAttention>.sectionhead .sectiontitle{font-size:20px}
+.filterchip{background:var(--panel);font-weight:600;padding:7px 14px}.filterchip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:12px 0}.chips::-webkit-scrollbar{display:none}.filterchip{flex:none}
+.monthhead{padding:6px 12px;background:var(--soft);border-radius:8px}
+.bankhead{padding:6px 12px;background:var(--soft);border-radius:8px}
+</style>
 </head>
 <body>
 <div id="pullRefresh"><span>↻ Refreshing…</span></div>
@@ -78,7 +90,7 @@
         <div class="stat"><strong id="dueTotal">₹0</strong><span>Current dues</span></div>
       </div>
       <div id="homeAttention"></div>
-      <div class="msbar"><span class="sectiontitle" style="font-size:14px">Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select><span class="spacer"></span><span class="sectiontitle" style="font-size:14px">Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></div>
+      <div class="msbar"><label class="msfield"><span>Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select></label><label class="msfield"><span>Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></label></div>
       <div id="msSection"></div>
       <div id="renewalSection"></div>
     </div>
