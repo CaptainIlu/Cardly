@@ -116,7 +116,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
     </div>
 
     <div class="tabpane" id="tab-insights" hidden>
-      <div class="sectionhead"><div><div class="sectiontitle">Spend insights</div><div class="muted" id="insSub"></div></div></div>
+      <div class="sectionhead"><div><div class="sectiontitle">Insights</div><div class="muted" id="insSub"></div></div></div>
       <div class="chips" id="insRange"></div>
       <div id="insBody"></div>
     </div>
@@ -245,7 +245,7 @@ function bankById(bankId){return state.banks.find(b=>b.id===bankId)}
 function bankName(bankId){const b=bankById(bankId);return b?b.name:'Unknown bank'}
 function last4Tag(c){return c&&c.last4?` · •••• ${esc(c.last4)}`:''}
 function bankTag(bankId){const b=bankById(bankId);if(!b)return '';if(b.logoUrl)return `<img src="${esc(b.logoUrl)}" class="bankbadge" data-bank="${esc(b.name)}" onerror="bankImgFallback(this)" alt="">`;return bankInitialsBadge(b.name)}
-function billingCycleRange(c){if(!c)return ['',''];const closed=latestStatementDate(c);if(!closed)return ['',''];const m=closed.match(/^(\d{4})-(\d{2})-(\d{2})$/),day=Number(c.statementDay);const end=dateForMonth(Number(m[1]),Number(m[2]),day);return [addDays(closed,1),end]}
+function billingCycleRange(c){if(!c)return ['',''];const closed=latestStatementDate(c);if(!closed)return ['',''];const m=closed.match(/^(\d{4})-(\d{2})-(\d{2})$/),day=Number(c.statementDay);const end=dateForMonth(Number(m[1]),Number(m[2]),day);return [closed,addDays(end,-1)]}
 function periodRange(type,c,ms_){if(type==='CUSTOM')return [ms_&&ms_.startDate||'',ms_&&ms_.endDate||''];if(type==='BILLING_CYCLE')return billingCycleRange(c);const d=new Date(), y=d.getFullYear(),m=d.getMonth(),day=d.getDate();let start,end;if(type==='CALENDAR_MONTH'){start=new Date(y,m,1);end=new Date(y,m+1,0)}else if(type==='CALENDAR_QUARTER'){const q=Math.floor(m/3);start=new Date(y,q*3,1);end=new Date(y,q*3+3,0)}else if(type==='CALENDAR_YEAR'){start=new Date(y,0,1);end=new Date(y,11,31)}else if(type==='MEMBERSHIP_YEAR'){if(!c||!c.renewalDate)return ['',''];const next=nextRenewalDate(c);if(!next)return ['',''];const nm=next.match(/^(\d{4})-(\d{2})-(\d{2})$/);const nextD=new Date(Number(nm[1]),Number(nm[2])-1,Number(nm[3]));const startD=new Date(nextD);startD.setFullYear(startD.getFullYear()-1);const endD=new Date(nextD);endD.setDate(endD.getDate()-1);start=startD;end=endD}else{start=new Date(y,m,1);end=new Date(y,m+1,0)}return [ymd(start),ymd(end)]}
 function spend(cardId,type,mm){const c=state.cards.find(x=>x.id===cardId);if(!mm){let ms=state.milestones.filter(x=>x.cardId===cardId&&x.periodType===type);if(!ms.length)return 0}let [s,e]=periodRange(type,c,mm);if(!s)return 0;return state.transactions.filter(t=>t.cardId===cardId&&t.type!=='PAYMENT'&&t.status!=='REFUNDED'&&t.date>=s&&t.date<=e).reduce((a,t)=>a+Number(t.amount),0)}
 function milestonePeriodLabel(type,m){if(type==='CUSTOM')return m&&m.startDate?`Custom · ${displayDate(m.startDate)} → ${displayDate(m.endDate)}`:'Custom';return type==='MEMBERSHIP_YEAR'?'Fee waiver · membership year':type.replaceAll('_',' ')}
@@ -373,20 +373,22 @@ function renderAis(){
   document.getElementById('aisTracker').innerHTML=head+(used.length?`<div class="list">${rows}</div>`:'<div class="panel empty">No bill payments logged this financial year yet.</div>')+(idle.length?`<div class="muted" style="margin-top:14px">No payments yet this FY: ${idle.map(g=>esc(g.bankName)).join(', ')}</div>`:'');
 }
 
-let insRange='fy',insBy='card',insSel=null;
+let insRange='fy',insBy='card',insSel=null,insMetric='spend';
+function setInsMetric(m){insMetric=m;insSel=null;renderInsights()}
 function setInsRange(r){insRange=r;insSel=null;renderInsights()}function setInsBy(b){insBy=b;renderInsights()}function setInsSel(k){insSel=k;renderInsights()}
 function insMonths(){const t=today(),y=Number(t.slice(0,4)),m=Number(t.slice(5,7));let n,sy,sm;if(insRange==='fy'){sy=m>=4?y:y-1;sm=4;n=(y-sy)*12+m-4+1}else{n=Number(insRange);let idx=y*12+m-1-(n-1);sy=Math.floor(idx/12);sm=idx%12+1}const out=[];for(let k=0;k<n;k++){const idx=sy*12+sm-1+k,yy=Math.floor(idx/12),mm=idx%12+1;out.push(`${yy}-${String(mm).padStart(2,'0')}`)}return out}
 function renderInsights(){
-  const months=insMonths(),set=new Set(months),mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const isR0=insMetric==='rewards',months=insMonths(),set=new Set(months),mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const lab=k=>mn[Number(k.slice(5))-1]+" '"+k.slice(2,4);
-  document.getElementById('insRange').innerHTML=[['fy',fyRange().label],['6','Last 6 months'],['12','Last 12 months']].map(([v,l])=>`<button class="filterchip${insRange===v?' active':''}" onclick="setInsRange('${v}')">${l}</button>`).join('');
-  const tx=state.transactions.filter(t=>t.type==='PURCHASE'&&t.status!=='REFUNDED'&&set.has(String(t.date).slice(0,7)));
-  const byM={};months.forEach(k=>byM[k]=0);tx.forEach(t=>byM[String(t.date).slice(0,7)]+=Number(t.amount)||0);
-  const total=tx.reduce((a,t)=>a+Number(t.amount),0),max=Math.max(1,...months.map(k=>byM[k]));
+  document.getElementById('insRange').innerHTML=`<div class="insseg" style="margin:0 8px 0 0;flex:none"><button class="${isR0?'':'on'}" onclick="setInsMetric('spend')">Spend</button><button class="${isR0?'on':''}" onclick="setInsMetric('rewards')">Rewards</button></div>`+[['fy',fyRange().label],['6','Last 6 months'],['12','Last 12 months']].map(([v,l])=>`<button class="filterchip${insRange===v?' active':''}" onclick="setInsRange('${v}')">${l}</button>`).join('');
+  const isR=insMetric==='rewards',cardOf=t=>state.cards.find(x=>x.id===t.cardId),val=t=>isR?rewardFor(t,cardOf(t)):Number(t.amount)||0;
+  const tx=state.transactions.filter(t=>t.type==='PURCHASE'&&t.status!=='REFUNDED'&&set.has(String(t.date).slice(0,7))&&val(t)>0);
+  const byM={};months.forEach(k=>byM[k]=0);tx.forEach(t=>byM[String(t.date).slice(0,7)]+=val(t));
+  const total=tx.reduce((a,t)=>a+val(t),0),max=Math.max(1,...months.map(k=>byM[k]));
   const avg=total/months.length,topM=months.reduce((b,k)=>byM[k]>byM[b]?k:b,months[0]);
-  document.getElementById('insSub').textContent=tx.length?`${tx.length} purchase${tx.length===1?'':'s'} · refunded ones excluded`:'';
-  if(!tx.length){document.getElementById('insBody').innerHTML='<div class="panel empty">No purchases in this period yet. Add transactions to see insights.</div>';return}
-  const groups=new Map();tx.forEach(t=>{const c=state.cards.find(x=>x.id===t.cardId);const key=insBy==='bank'?(c?c.bankId:'?'):t.cardId;const g=groups.get(key)||{key,total:0,n:0,c};g.total+=Number(t.amount);g.n++;groups.set(key,g)});
+  document.getElementById('insSub').textContent=tx.length?`${tx.length} purchase${tx.length===1?'':'s'}${isR0?' earning rewards':''} · refunded ones excluded`:'';
+  if(!tx.length){document.getElementById('insBody').innerHTML=`<div class="panel empty">${isR?'No rewards in this period. Set a rewards rate (%) on your cards and add purchases to see rewards.':'No purchases in this period yet. Add transactions to see insights.'}</div>`;return}
+  const groups=new Map();tx.forEach(t=>{const c=state.cards.find(x=>x.id===t.cardId);const key=insBy==='bank'?(c?c.bankId:'?'):t.cardId;const g=groups.get(key)||{key,total:0,n:0,c};g.total+=val(t);g.n++;groups.set(key,g)});
   let rows=[...groups.values()].sort((a,b)=>b.total-a.total);
   const top=rows[0],nameOf=g=>insBy==='bank'?bankName(g.c&&g.c.bankId):(g.c?g.c.name:'Deleted card');
   let shown=rows.slice(0,8),rest=rows.slice(8);top.total=Math.max(top.total,rest.reduce((a,g)=>a+g.total,0));if(rest.length)shown.push({other:true,total:rest.reduce((a,g)=>a+g.total,0),n:rest.length});
@@ -395,9 +397,9 @@ function renderInsights(){
   const bars=months.map(k=>`<div class="insbar${sel===k?' on':''}${byM[k]?'':' zero'}" onclick="setInsSel('${k}')" title="${lab(k)}: ${money(byM[k])}"><i style="height:${byM[k]?Math.max(2,byM[k]/max*100):2}%"></i></div>`).join('');
   const xl=months.map((k,i)=>`<span>${months.length>8&&i%2?'':mn[Number(k.slice(5))-1]}</span>`).join('');
   const brk=shown.map(g=>g.other?`<div class="insrow"><div class="nm muted">Other (${g.n} ${insBy==='bank'?'banks':'cards'})</div><div class="amt">${money(g.total)}<span>${Math.round(g.total/total*100)}%</span></div><div class="tr"><i style="width:${g.total/top.total*100}%"></i></div></div>`:`<div class="insrow"><div class="nm bnrow">${g.c?bankTag(g.c.bankId):''}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nameOf(g))}${insBy==='card'&&g.c&&g.c.last4?` <span class="muted">·${esc(g.c.last4)}</span>`:''}</span></div><div class="amt">${money(g.total)}<span>${Math.round(g.total/total*100)}%</span></div><div class="tr"><i style="width:${g.total/top.total*100}%"></i></div></div>`).join('');
-  document.getElementById('insBody').innerHTML=`<div class="inskpis"><div class="panel inskpi"><div class="k">Total</div><div class="v">${money(total)}</div><div class="s">${months.length} month${months.length===1?'':'s'}</div></div><div class="panel inskpi"><div class="k">Avg / month</div><div class="v">${money(avg)}</div><div class="s">&nbsp;</div></div><div class="panel inskpi"><div class="k">Peak</div><div class="v">${money(byM[topM])}</div><div class="s">${lab(topM)}</div></div></div>
-  <div class="panel inspanel"><h3>Monthly spend</h3><div class="insdetail">${detail}</div><div class="insbars">${bars}</div><div class="insx">${xl}</div></div>
-  <div class="panel inspanel"><h3>Where it went</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div>`;
+  document.getElementById('insBody').innerHTML=`<div class="inskpis"><div class="panel inskpi"><div class="k">${isR?'Rewards':'Total'}</div><div class="v">${money(total)}</div><div class="s">${months.length} month${months.length===1?'':'s'}</div></div><div class="panel inskpi"><div class="k">Avg / month</div><div class="v">${money(avg)}</div><div class="s">&nbsp;</div></div><div class="panel inskpi"><div class="k">Peak</div><div class="v">${money(byM[topM])}</div><div class="s">${lab(topM)}</div></div></div>
+  <div class="panel inspanel"><h3>Monthly ${isR?'rewards':'spend'}</h3><div class="insdetail">${detail}</div><div class="insbars">${bars}</div><div class="insx">${xl}</div></div>
+  <div class="panel inspanel"><h3>${isR?'Where rewards came from':'Where it went'}</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div>`;
 }
 function render(){renderHome();renderCards();renderTransactions();renderInsights();renderAis();updateNotifyBtn();maybeSendNotifications()}
 async function load(){const settingsChanged=ensureSettings(),banksChanged=ensureBanks();if(settingsChanged||banksChanged){try{await saveDataFile()}catch{}}for(const c of [...state.cards]){let changed=false;if(c.billDate==null){c.billDate=c.paymentDate||today();changed=true}if(c.paidAmount!=null&&Number(c.paidAmount)>0&&!c.legacyPaymentMigrated){const legacy={id:id(),cardId:c.id,date:c.paymentDate||today(),merchant:'Bill Payment',amount:Number(c.paidAmount),type:'PAYMENT',status:'COMPLETED',refundDate:''};state.transactions.push(legacy);await put('transactions',legacy);c.legacyPaymentMigrated=true;changed=true}if(changed)await put('cards',c)}for(const t of [...state.transactions]){let changed=false;if(!t.type)t.type='PURCHASE',changed=true;if(!t.status){t.status='COMPLETED';changed=true}if(t.refundDate==null){t.refundDate='';changed=true}if(changed)await put('transactions',t)}render()}
@@ -628,7 +630,7 @@ function openCard(cardId){
       ${ms.length?ms.map(m=>{const v=spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone panel cardrow"><div class="milestonehead"><strong>${esc(m.name)}</strong><div class="milestone-actions"><span>${Math.round(p)}%</span><button class="btn milestone-edit-btn" onclick="openMilestone('${m.id}')">Edit</button></div></div><div class="meta">${esc(milestonePeriodLabel(m.periodType,m))}</div><div class="bar"><div class="fill" style="width:${p}%"></div></div><div class="meta">${money(v)} / ${money(m.targetAmount)} · ${money(Math.max(0,Number(m.targetAmount)-v))} remaining</div>${note?`<div class="meta" style="margin-top:4px">${note}</div>`:''}</div>`}).join(''):'<div class="panel empty">No milestones configured.</div>'}
     </div>
     <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><button class="btn" onclick="detailDialog.close();openTxnFor('${c.id}')">+ Add</button></div>
-      <div class="panel">${ts.length?ts.map(t=>`<div class="row"><span><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc((x=>x?bankName(x.bankId):'Unknown bank')(state.cards.find(x=>x.id===t.cardId)))} · ${esc(state.cards.find(x=>x.id===t.cardId)?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${t.status==='REFUNDED'?'· REFUNDED':''}</span></span><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${money(t.amount)}</strong></div>`).join(''):'<div class="empty">No transactions for this card.</div>'}</div>
+      <div class="panel">${ts.length?ts.map(t=>`<div class="row"><span><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc((x=>x?bankName(x.bankId):'Unknown bank')(state.cards.find(x=>x.id===t.cardId)))} · ${esc(state.cards.find(x=>x.id===t.cardId)?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${t.status==='REFUNDED'?'· REFUNDED':''}</span></span><div class="txn-actions"><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${money(t.amount)}</strong><button class="iconbtn" title="Edit" onclick="detailDialog.close();openEditTxn('${t.id}')">✎</button></div></div>`).join(''):'<div class="empty">No transactions for this card.</div>'}</div>
     </div>`;
   detailDialog.showModal();
 }
