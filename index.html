@@ -105,6 +105,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 
     <div class="tabpane" id="tab-cards" hidden>
       <div class="toolbar"><input class="search" id="search" placeholder="Search cards..."><select id="statusFilter"><option value="all">All status</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select><button class="btn primary addbtn" id="addCard" title="Add card" aria-label="Add card">+</button></div>
+      <div class="chips" id="cardBankChips"></div>
       <div id="cards" class="list"></div>
     </div>
 
@@ -332,9 +333,13 @@ function cardRowHtml(c){
   const billLine=isDebit?'':`<div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>`;
   return `<div class="panel cardrow clickable" onclick="openCard('${c.id}')"><div class="cardmain"><div><div class="cardname">${esc(c.name)}</div><div class="meta">${metaLine}</div></div><div class="badges">${badges}</div></div>${billLine}${cms.length?`<div class="card-milestones"><div class="milestone-label">Milestones</div>${cms.map(m=>{const v=spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone"><div class="milestonehead"><span>${esc(m.name)} · ${money(v)} / ${money(m.targetAmount)}</span><span>${Math.round(p)}%</span></div><div class="bar"><div class="fill" style="width:${p}%"></div></div>${note?`<div class="meta">${note}</div>`:''}</div>`}).join('')}</div>`:''}</div>`;
 }
+function setCardBankFilter(id){try{localStorage.setItem('cardly-card-bank',id)}catch(e){}renderCards()}
 function renderCards(){
+  const activeCards=state.cards.filter(c=>c.active!==false),bankIds=[...new Set(activeCards.map(c=>c.bankId))].filter(Boolean).sort((a,b)=>bankName(a).localeCompare(bankName(b)));
+  let bsel='all';try{bsel=localStorage.getItem('cardly-card-bank')||'all'}catch(e){}if(bsel!=='all'&&!bankIds.includes(bsel))bsel='all';
+  document.getElementById('cardBankChips').innerHTML=`<button class="filterchip${bsel==='all'?' active':''}" onclick="setCardBankFilter('all')">All banks</button>`+bankIds.map(b=>`<button class="filterchip${bsel===b?' active':''}" onclick="setCardBankFilter('${b}')">${bankTag(b)}${esc(bankName(b))}</button>`).join('');
   const q=document.getElementById('search').value.toLowerCase(),f=document.getElementById('statusFilter').value;
-  const cards=state.cards.filter(c=>c.active!==false&&(`${bankName(c.bankId)} ${c.name} ${c.last4||''}`).toLowerCase().includes(q)&&(f==='all'||status(c)===f)).sort((a,b)=>bankName(a.bankId).localeCompare(bankName(b.bankId))||String(a.name||'').localeCompare(String(b.name||'')));
+  const cards=state.cards.filter(c=>c.active!==false&&(bsel==='all'||c.bankId===bsel)&&(`${bankName(c.bankId)} ${c.name} ${c.last4||''}`).toLowerCase().includes(q)&&(f==='all'||status(c)===f)).sort((a,b)=>bankName(a.bankId).localeCompare(bankName(b.bankId))||String(a.name||'').localeCompare(String(b.name||'')));
   const counts={};cards.forEach(c=>{counts[c.bankId]=(counts[c.bankId]||0)+1});
   let last=null,out='';
   cards.forEach(c=>{if(c.bankId!==last){out+=`<div class="bankhead bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} <span class="muted" style="font-weight:500">· ${counts[c.bankId]}</span></span></div>`;last=c.bankId}out+=cardRowHtml(c)});
