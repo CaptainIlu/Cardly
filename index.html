@@ -64,6 +64,8 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .insx{display:flex;gap:6px;margin-top:6px}.insx span{flex:1;min-width:0;text-align:center;font-size:11px;color:var(--muted);overflow:hidden}
 .insrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:7px 0}.insrow .nm{min-width:0}.insrow .amt{font-size:13px;font-weight:700;white-space:nowrap}.insrow .amt span{color:var(--muted);font-weight:500;margin-left:6px}.insrow .tr{grid-column:1/3;height:8px;background:var(--soft);border-radius:4px;overflow:hidden}.insrow .tr i{display:block;height:100%;background:var(--accent);border-radius:4px}
 .insseg{display:inline-flex;background:var(--soft);border-radius:999px;padding:3px;margin:8px 0 6px}.insseg button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:5px 14px;border-radius:999px}.insseg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+
+#cardPage .hero{align-items:flex-start;gap:10px}#cardPage .hero>div:first-child{min-width:0;flex:1}#cardPage .title{font-size:24px;line-height:1.2}#cardPage .hero-actions{display:flex;gap:8px;flex:none}#cardPageBody{margin-top:6px}
 </style>
 </head>
 <body>
@@ -128,8 +130,17 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
     </div>
   </main>
 
+  <main id="cardPage" hidden>
+    <div class="hero"><div><div class="eyebrow">Card details</div><div class="title" id="cardPageTitle">Card</div></div><div class="hero-actions"><button class="iconbtn" id="cardPageEdit" title="Edit card details">✎</button><button class="btn" id="cardPageBack">← Back</button></div></div>
+    <div id="cardPageBody"></div>
+  </main>
+
   <main id="settingsPage" hidden>
     <div class="hero"><div><div class="eyebrow">Configuration</div><div class="title">Settings</div><div class="sub">Applies across all your cards.</div></div><div class="hero-actions"><button class="btn" id="settingsBack">← Back</button></div></div>
+    <section class="section">
+      <div class="sectionhead"><div><div class="sectiontitle">Card details view</div><div class="muted">How a card opens when you tap it.</div></div></div>
+      <div class="panel" style="padding:14px"><select id="cardViewSelect"><option value="page">Full page</option><option value="dialog">Pop-up dialog</option></select></div>
+    </section>
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Card holders</div><div class="muted">Track family members' cards separately. Switch between holders at the top of the dashboard; each holder gets their own totals, bills, milestones and AIS tracker.</div></div></div>
       <div class="panel bankgrid" id="holderList"></div>
@@ -201,7 +212,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 </form></div></dialog>
 
 
-<dialog id="detailDialog"><div class="modal" style="max-height:88vh;overflow:auto"><div class="modalhead"><h2 id="detailTitle">Card</h2><div style="display:flex;gap:8px"><button class="iconbtn" id="editCardBtn" title="Edit card details">✎</button><button class="iconbtn" onclick="detailDialog.close()">×</button></div></div><div id="detailContent"></div></div></dialog>
+<dialog id="detailDialog"><div class="modal" style="max-height:88vh;overflow:auto"><div class="modalhead"><h2 id="detailTitle">Card</h2><div style="display:flex;gap:8px"><button class="iconbtn" id="editCardBtn" title="Edit card details">✎</button><button class="iconbtn" onclick="closeCardDetail()">×</button></div></div><div id="detailContent"></div></div></dialog>
 
 <dialog id="txnDialog"><div class="modal"><div class="modalhead"><h2 id="txnDialogTitle">Add transaction</h2><button class="iconbtn" onclick="txnDialog.close()">×</button></div>
 <form id="txnForm" class="form">
@@ -425,7 +436,7 @@ function renderInsights(){
   <div class="panel inspanel"><h3>${isR?'Where rewards came from':'Where it went'}</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div>`;
 }
 ['renderHome','renderCards','renderTransactions','renderInsights','renderAis'].forEach(n=>{const f=window[n];window[n]=function(){return withHolder(f)}});
-function render(){renderHolderBar();renderHome();renderCards();renderTransactions();renderInsights();renderAis();updateNotifyBtn();maybeSendNotifications()}
+function render(){if(cardPageOpen()&&detailDialog.dataset.cardId&&state.cards.some(c=>c.id===detailDialog.dataset.cardId))openCard(detailDialog.dataset.cardId);renderHolderBar();renderHome();renderCards();renderTransactions();renderInsights();renderAis();updateNotifyBtn();maybeSendNotifications()}
 async function load(){const settingsChanged=ensureSettings(),banksChanged=ensureBanks();if(settingsChanged||banksChanged){try{await saveDataFile()}catch{}}for(const c of [...state.cards]){let changed=false;if(c.billDate==null){c.billDate=c.paymentDate||today();changed=true}if(c.paidAmount!=null&&Number(c.paidAmount)>0&&!c.legacyPaymentMigrated){const legacy={id:id(),cardId:c.id,date:c.paymentDate||today(),merchant:'Bill Payment',amount:Number(c.paidAmount),type:'PAYMENT',status:'COMPLETED',refundDate:''};state.transactions.push(legacy);await put('transactions',legacy);c.legacyPaymentMigrated=true;changed=true}if(changed)await put('cards',c)}for(const t of [...state.transactions]){let changed=false;if(!t.type)t.type='PURCHASE',changed=true;if(!t.status){t.status='COMPLETED';changed=true}if(t.refundDate==null){t.refundDate='';changed=true}if(changed)await put('transactions',t)}render()}
 function setFileError(message=''){document.getElementById('dataFileError').textContent=message}
 function openHandleDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open('cardly-file-link',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('settings'))d.createObjectStore('settings');if(!d.objectStoreNames.contains('mobileData'))d.createObjectStore('mobileData')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
@@ -434,7 +445,7 @@ async function getRememberedFileHandle(){const d=await openHandleDB();const hand
 async function saveMobileData(){const d=await openHandleDB();await new Promise((resolve,reject)=>{const r=d.transaction('mobileData','readwrite').objectStore('mobileData').put(serialisedData(),'data');r.onsuccess=resolve;r.onerror=()=>reject(r.error)});d.close()}
 async function getMobileData(){const d=await openHandleDB();const data=await new Promise((resolve,reject)=>{const r=d.transaction('mobileData').objectStore('mobileData').get('data');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});d.close();return data}
 function applyData(data){if(!data||!Array.isArray(data.cards)||!Array.isArray(data.milestones)||!Array.isArray(data.transactions))throw new Error('This file is not a valid Cardly data file.');state={cards:data.cards,milestones:data.milestones,transactions:data.transactions,settings:data.settings,banks:Array.isArray(data.banks)?data.banks:[]}}
-function showDashboard(){document.getElementById('dataGate').hidden=true;document.getElementById('dashboard').hidden=false;document.getElementById('settingsPage').hidden=true;setTab(localStorage.getItem('cardly-tab')||'home');document.getElementById('settingsBtn').hidden=false;document.getElementById('exportDataFile').hidden=!mobileStorage;setFileError('')}
+function showDashboard(){document.getElementById('cardPage').hidden=true;document.getElementById('dataGate').hidden=true;document.getElementById('dashboard').hidden=false;document.getElementById('settingsPage').hidden=true;setTab(localStorage.getItem('cardly-tab')||'home');document.getElementById('settingsBtn').hidden=false;document.getElementById('exportDataFile').hidden=!mobileStorage;setFileError('')}
 async function useDataFile(handle,createNew=false){dataFileHandle=handle;mobileStorage=false;try{if(createNew){state={cards:[],milestones:[],transactions:[],banks:[]};await saveDataFile()}else{const file=await handle.getFile(),text=await file.text();if(!text.trim()){state={cards:[],milestones:[],transactions:[],banks:[]};await saveDataFile()}else applyData(JSON.parse(text))}await load();await rememberFileHandle(handle);showDashboard()}catch(err){dataFileHandle=null;setFileError(`Could not open that file: ${err.message}`)}}
 async function importDataFile(file){try{applyData(JSON.parse(await file.text()));dataFileHandle=null;mobileStorage=true;await saveMobileData();await load();showDashboard()}catch(err){setFileError(`Could not import that file: ${err.message}`)}}
 function exportMobileData(){const file=new Blob([JSON.stringify(serialisedData(),null,2)],{type:'application/json'}),url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download='cardly-data.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
@@ -501,6 +512,7 @@ function ensureSettings(){
   if(!(Number(s.billGraceDays)>=0)){s.billGraceDays=2;changed=true}
   if(!(Number(s.feeRenewalDays)>=1)){s.feeRenewalDays=21;changed=true}
   if(!(Number(s.renewalListDays)>=1)){s.renewalListDays=90;changed=true}
+  if(s.cardView!=='dialog'&&s.cardView!=='page'){s.cardView='page';changed=true}
   if(!Array.isArray(s.holders)||!s.holders.some(h=>h&&h.id==='me')){s.holders=[{id:'me',name:'Me'},...(Array.isArray(s.holders)?s.holders.filter(h=>h&&h.id&&h.id!=='me'&&h.name):[])];changed=true}
   return changed;
 }
@@ -544,9 +556,9 @@ function populateBankSelect(selectedId=''){
 }
 cardBank.onchange=()=>{const isNew=cardBank.value==='__new__';cardNewBank.hidden=!isNew;cardNewBank.required=isNew;if(isNew)cardNewBank.focus()};
 function bankFromForm(f){let bankId=String(f.get('bank')||'').trim();if(bankId==='__new__'){const name=String(f.get('newBank')||'').trim();if(!name)throw new Error('Enter the new bank name.');return addBankEntity(name).id}if(!bankId)throw new Error('Select a bank.');if(!bankById(bankId))throw new Error('Select a bank.');return bankId}
-function showView(v){document.getElementById('dashboard').hidden=v!=='dashboard';document.getElementById('settingsPage').hidden=v!=='settings';if(v==='settings')renderSettings();else render();window.scrollTo(0,0)}
+function showView(v){document.getElementById('cardPage').hidden=true;document.getElementById('dashboard').hidden=v!=='dashboard';document.getElementById('settingsPage').hidden=v!=='settings';if(v==='settings')renderSettings();else render();window.scrollTo(0,0)}
 function renderSettings(){
-  renderHolderSettings();
+  renderHolderSettings();cardViewSelect.value=cardViewMode();
   const counts=new Map();state.cards.forEach(c=>{if(c.bankId)counts.set(c.bankId,(counts.get(c.bankId)||0)+1)});
   const banks=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
   document.getElementById('bankList').innerHTML=banks.length?banks.map(b=>{const n=counts.get(b.id)||0;return `<span class="bankchip">${bankTag(b.id)}<span>${esc(b.name)}</span><span class="bc">${n}</span><button class="chipbtn" title="Set logo URL" onclick="editBankLogo('${b.id}')">🖼</button><button class="chipbtn" title="Rename" onclick="renameBank('${b.id}')">✎</button>${n?'':`<button class="chipbtn" title="Remove (no cards use it)" onclick="removeBank('${b.id}')">✕</button>`}</span>`}).join(''):'<span class="muted">No banks yet. Add one below.</span>';
@@ -565,6 +577,7 @@ function renderHolderSettings(){const counts=new Map();state.cards.forEach(c=>co
 async function addHolder(){const name=String(newHolderName.value||'').trim();if(!name)return;if(holders().some(h=>h.name.toLowerCase()===name.toLowerCase())){toast('That holder already exists.');return}state.settings.holders=[...holders(),{id:id(),name}];newHolderName.value='';await commitSettings('✓ Holder added');render()}
 async function renameHolder(hid){const h=holders().find(x=>x.id===hid);if(!h)return;const name=String(prompt('Rename holder',h.name)||'').trim();if(!name||name===h.name)return;if(holders().some(x=>x.id!==hid&&x.name.toLowerCase()===name.toLowerCase())){toast('That name is already used.');return}h.name=name;await commitSettings('✓ Holder renamed');render()}
 async function removeHolder(hid){if(state.cards.some(c=>cardHolder(c)===hid)){toast('Move or delete this holder\'s cards first.');return}state.settings.holders=holders().filter(h=>h.id!==hid);if(activeHolder()===hid)try{localStorage.setItem('cardly-holder','me')}catch(e){}await commitSettings('✓ Holder removed');render()}
+cardViewSelect.onchange=async()=>{state.settings.cardView=cardViewSelect.value;await commitSettings('✓ Saved')};
 addHolderBtn.onclick=addHolder;newHolderName.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addHolder()}};
 addBankBtn.onclick=async()=>{const v=newBankName.value;await addBankFromSetting(v);newBankName.value=''};
 newBankName.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addBankBtn.click()}};
@@ -634,9 +647,28 @@ function openEditCard(cardId){
   applyCardTypeVisibility();
   cardDialog.showModal();
 }
-editCardBtn.onclick=()=>{const cardId=detailDialog.dataset.cardId;detailDialog.close();openEditCard(cardId)};
+editCardBtn.onclick=()=>{const cardId=detailDialog.dataset.cardId;nestedFromDetail();openEditCard(cardId)};
+cardPageEdit.onclick=()=>openEditCard(detailDialog.dataset.cardId);
+cardPageBack.onclick=()=>closeCardDetail();
 addTxn.onclick=()=>openTxnFor(state.cards.find(c=>c.active!==false)?.id||'')
 
+
+let cardPageScrollY=0;
+function cardViewMode(){return (state.settings&&state.settings.cardView==='dialog')?'dialog':'page'}
+function cardPageOpen(){return !document.getElementById('cardPage').hidden}
+function cardDetailOpen(){return detailDialog.open||cardPageOpen()}
+function placeDetailContent(toPage){const host=toPage?cardPageBody:detailDialog.querySelector('.modal');if(detailContent.parentNode!==host)host.appendChild(detailContent)}
+function showCardDetail(){
+  if(cardViewMode()==='page'){
+    placeDetailContent(true);cardPageTitle.innerHTML=detailTitle.innerHTML;
+    if(!cardPageOpen()){cardPageScrollY=window.scrollY;document.getElementById('dashboard').hidden=true;document.getElementById('settingsPage').hidden=true;cardPage.hidden=false;window.scrollTo(0,0)}
+  }else{placeDetailContent(false);if(!detailDialog.open)detailDialog.showModal()}
+}
+function closeCardDetail(){
+  if(detailDialog.open)detailDialog.close();
+  if(cardPageOpen()){cardPage.hidden=true;document.getElementById('dashboard').hidden=false;placeDetailContent(false);render();window.scrollTo(0,cardPageScrollY)}
+}
+function nestedFromDetail(){if(detailDialog.open)detailDialog.close()}
 function openCard(cardId){
   const c=state.cards.find(x=>x.id===cardId); if(!c)return;
   detailDialog.dataset.cardId=cardId;
@@ -662,10 +694,10 @@ function openCard(cardId){
     <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Milestones</div><button class="btn" onclick="openNewMilestone('${c.id}')">+ Add Milestone</button></div>
       ${ms.length?ms.map(m=>{const v=spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone panel cardrow"><div class="milestonehead"><strong>${esc(m.name)}</strong><div class="milestone-actions"><span>${Math.round(p)}%</span><button class="btn milestone-edit-btn" onclick="openMilestone('${m.id}')">Edit</button></div></div><div class="meta">${esc(milestonePeriodLabel(m.periodType,m))}</div><div class="bar"><div class="fill" style="width:${p}%"></div></div><div class="meta">${money(v)} / ${money(m.targetAmount)} · ${money(Math.max(0,Number(m.targetAmount)-v))} remaining</div>${note?`<div class="meta" style="margin-top:4px">${note}</div>`:''}</div>`}).join(''):'<div class="panel empty">No milestones configured.</div>'}
     </div>
-    <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><button class="btn" onclick="detailDialog.close();openTxnFor('${c.id}')">+ Add</button></div>
-      <div class="panel">${ts.length?ts.map(t=>`<div class="row"><span><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc((x=>x?bankName(x.bankId):'Unknown bank')(state.cards.find(x=>x.id===t.cardId)))} · ${esc(state.cards.find(x=>x.id===t.cardId)?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${t.status==='REFUNDED'?'· REFUNDED':''}</span></span><div class="txn-actions"><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${money(t.amount)}</strong><button class="iconbtn" title="Edit" onclick="detailDialog.close();openEditTxn('${t.id}')">✎</button></div></div>`).join(''):'<div class="empty">No transactions for this card.</div>'}</div>
+    <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><button class="btn" onclick="nestedFromDetail();openTxnFor('${c.id}')">+ Add</button></div>
+      <div class="panel">${ts.length?ts.map(t=>`<div class="row"><span><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc((x=>x?bankName(x.bankId):'Unknown bank')(state.cards.find(x=>x.id===t.cardId)))} · ${esc(state.cards.find(x=>x.id===t.cardId)?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${t.status==='REFUNDED'?'· REFUNDED':''}</span></span><div class="txn-actions"><strong class="${t.status==='REFUNDED'?'txn-refunded':''}">${money(t.amount)}</strong><button class="iconbtn" title="Edit" onclick="nestedFromDetail();openEditTxn('${t.id}')">✎</button></div></div>`).join(''):'<div class="empty">No transactions for this card.</div>'}</div>
     </div>`;
-  detailDialog.showModal();
+  showCardDetail();
 }
 function openBill(cardId,suggestedBillDate=''){
   const c=state.cards.find(x=>x.id===cardId);if(!c)return;
@@ -678,7 +710,7 @@ function openBill(cardId,suggestedBillDate=''){
   billDialog.showModal();
 }
 billNotDue.onchange=()=>{billAmount.disabled=billNotDue.checked;billAmount.required=!billNotDue.checked;if(billNotDue.checked)billAmount.value='0'};
-billForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveBill');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const c=state.cards.find(x=>x.id===billForm.dataset.cardId);if(!c)throw new Error('Card not found.');const bill=billNotDue.checked?0:Number(billAmount.value||0);if(bill<0)throw new Error('Bill amount cannot be negative.');c.currentBill=bill;c.billDate=dateForStorage(billForm.billDate.value);c.billNotDue=billNotDue.checked;await put('cards',c);billDialog.close();await load();toast(billNotDue.checked?'✓ Marked no bill this cycle':'✓ Current bill updated');if(detailDialog.open)openCard(c.id)}catch(err){toast('Could not update bill: '+err.message)}finally{b.disabled=false;b.textContent='Save Bill'}};
+billForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveBill');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const c=state.cards.find(x=>x.id===billForm.dataset.cardId);if(!c)throw new Error('Card not found.');const bill=billNotDue.checked?0:Number(billAmount.value||0);if(bill<0)throw new Error('Bill amount cannot be negative.');c.currentBill=bill;c.billDate=dateForStorage(billForm.billDate.value);c.billNotDue=billNotDue.checked;await put('cards',c);billDialog.close();await load();toast(billNotDue.checked?'✓ Marked no bill this cycle':'✓ Current bill updated');if(cardDetailOpen())openCard(c.id)}catch(err){toast('Could not update bill: '+err.message)}finally{b.disabled=false;b.textContent='Save Bill'}};
 function openPayment(cardId,markPaid=false){
   const c=state.cards.find(x=>x.id===cardId); if(!c)return;
   paymentForm.dataset.cardId=cardId;
@@ -700,7 +732,7 @@ function openEditTxn(txnId){
   setDateField(txnForm.date,t.date); txnForm.merchant.value=t.merchant; txnForm.amount.value=Number(t.amount);
   txnDialog.showModal();
 }
-async function deleteTxnFromDialog(){const id_=txnForm.dataset.txnId;if(!id_)return;await deleteTxn(id_);if(!state.transactions.some(x=>x.id===id_)){txnDialog.close();if(detailDialog.open&&detailDialog.dataset.cardId)openCard(detailDialog.dataset.cardId)}}
+async function deleteTxnFromDialog(){const id_=txnForm.dataset.txnId;if(!id_)return;await deleteTxn(id_);if(!state.transactions.some(x=>x.id===id_)){txnDialog.close();if(cardDetailOpen()&&detailDialog.dataset.cardId)openCard(detailDialog.dataset.cardId)}}
 async function deleteTxn(txnId){
   const t=state.transactions.find(x=>x.id===txnId);if(!t)return;
   if(!confirm(`Delete this ${money(t.amount)} transaction at "${t.merchant}"? This can't be undone.`))return;
@@ -710,17 +742,17 @@ function setTxnCardFilter(cardId){localStorage.setItem('cardly-txn-card',cardId)
 paymentForm.onsubmit=async e=>{
   e.preventDefault();const b=document.getElementById('savePayment');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';
   try{const cardId=paymentForm.dataset.cardId,c=state.cards.find(x=>x.id===cardId);const amount=Number(paymentAmount.value||0),remaining=outstanding(c);if(amount<=0)throw new Error('Payment amount must be greater than ₹0.');
-    const aisBefore=aisForCard(c)?.total||0;await put('transactions',{id:id(),cardId,date:dateForStorage(paymentForm.paymentDate.value),merchant:'Bill Payment',amount,type:'PAYMENT',status:'COMPLETED',refundDate:''});paymentDialog.close();await load();const aisAfter=aisForCard(c);let payMsg=amount>=remaining?'✓ Bill marked paid':'✓ Partial payment added';if(aisAfter&&aisAfter.level!=='ok'&&(aisBefore/aisLimit()*100<(aisAfter.level==='crossed'?100:aisWarnPct())))payMsg+=' · ⚠ '+aisMessage(aisAfter);toast(payMsg);if(detailDialog.open)openCard(cardId);
+    const aisBefore=aisForCard(c)?.total||0;await put('transactions',{id:id(),cardId,date:dateForStorage(paymentForm.paymentDate.value),merchant:'Bill Payment',amount,type:'PAYMENT',status:'COMPLETED',refundDate:''});paymentDialog.close();await load();const aisAfter=aisForCard(c);let payMsg=amount>=remaining?'✓ Bill marked paid':'✓ Partial payment added';if(aisAfter&&aisAfter.level!=='ok'&&(aisBefore/aisLimit()*100<(aisAfter.level==='crossed'?100:aisWarnPct())))payMsg+=' · ⚠ '+aisMessage(aisAfter);toast(payMsg);if(cardDetailOpen())openCard(cardId);
   }catch(err){toast('Could not save payment: '+err.message)}finally{b.disabled=false;b.textContent='Add Payment'}
 };
 
 function setMembershipYearAvailability(cardId){const c=state.cards.find(x=>x.id===cardId),opt=document.getElementById('membershipYearOption');if(!opt)return;const available=Boolean(c&&!c.lifetimeFree&&c.renewalDate);opt.disabled=!available;opt.textContent=available?'Membership Year':'Membership Year (set annual fee & renewal date first)'}
 function toggleCustomDates(){customDates.style.display=milestonePeriod.value==='CUSTOM'?'':'none';purposeField.style.display=milestonePeriod.value==='MEMBERSHIP_YEAR'?'':'none'}
-async function deleteMilestone(){const id_=milestoneForm.dataset.milestoneId,m=state.milestones.find(x=>x.id===id_);if(!m)return;if(!confirm(`Delete milestone "${m.name}"? This can't be undone.`))return;const cardId=m.cardId;await del('milestones',id_);milestoneDialog.close();await load();toast('✓ Milestone deleted');if(detailDialog.open)openCard(cardId)}
+async function deleteMilestone(){const id_=milestoneForm.dataset.milestoneId,m=state.milestones.find(x=>x.id===id_);if(!m)return;if(!confirm(`Delete milestone "${m.name}"? This can't be undone.`))return;const cardId=m.cardId;await del('milestones',id_);milestoneDialog.close();await load();toast('✓ Milestone deleted');if(cardDetailOpen())openCard(cardId)}
 function openMilestone(milestoneId){const m=state.milestones.find(x=>x.id===milestoneId);if(!m)return;milestoneForm.dataset.milestoneId=milestoneId;milestoneForm.dataset.cardId=m.cardId;milestoneDialogTitle.textContent='Edit milestone';setMembershipYearAvailability(m.cardId);milestoneName.value=m.name;milestonePeriod.value=m.periodType;milestoneStart.value=m.startDate||'';milestoneEnd.value=m.endDate||'';milestonePurpose.value=isFeeWaiver(m)?'WAIVER':'BONUS';toggleCustomDates();deleteMilestoneBtn.style.display='';milestoneTarget.value=Number(m.targetAmount);saveMilestone.textContent='Save Changes';milestoneDialog.showModal()}
 function openNewMilestone(cardId){if(!state.cards.some(c=>c.id===cardId))return;milestoneForm.reset();milestoneForm.dataset.milestoneId='';milestoneForm.dataset.cardId=cardId;milestoneDialogTitle.textContent='Add milestone';setMembershipYearAvailability(cardId);milestonePeriod.value='CALENDAR_MONTH';milestonePurpose.value='BONUS';toggleCustomDates();deleteMilestoneBtn.style.display='none';saveMilestone.textContent='Add Milestone';milestoneDialog.showModal()}
 milestonePeriod.addEventListener('change',toggleCustomDates);
-milestoneForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveMilestone');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const milestoneId=milestoneForm.dataset.milestoneId,cardId=milestoneForm.dataset.cardId,m=milestoneId?state.milestones.find(x=>x.id===milestoneId):{id:id(),cardId,active:true};if(!m||!state.cards.some(c=>c.id===cardId))throw new Error('Milestone not found.');const name=milestoneName.value.trim(),amount=Number(milestoneTarget.value||0);if(!name)throw new Error('Enter a milestone name.');if(amount<=0)throw new Error('Target spend must be greater than ₹0.');m.name=name;m.periodType=milestonePeriod.value;m.targetAmount=amount;if(m.periodType==='MEMBERSHIP_YEAR')m.purpose=milestonePurpose.value;else delete m.purpose;if(m.periodType==='CUSTOM'){const sd=milestoneStart.value,ed=milestoneEnd.value;if(!sd||!ed)throw new Error('Pick a start and end date.');if(ed<sd)throw new Error('End date must be after the start date.');m.startDate=sd;m.endDate=ed}else{delete m.startDate;delete m.endDate}await put('milestones',m);milestoneDialog.close();await load();toast(milestoneId?'✓ Milestone updated':'✓ Milestone added');if(detailDialog.open)openCard(cardId)}catch(err){toast('Could not save milestone: '+err.message)}finally{b.disabled=false;b.textContent=milestoneForm.dataset.milestoneId?'Save Changes':'Add Milestone'}};
+milestoneForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveMilestone');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const milestoneId=milestoneForm.dataset.milestoneId,cardId=milestoneForm.dataset.cardId,m=milestoneId?state.milestones.find(x=>x.id===milestoneId):{id:id(),cardId,active:true};if(!m||!state.cards.some(c=>c.id===cardId))throw new Error('Milestone not found.');const name=milestoneName.value.trim(),amount=Number(milestoneTarget.value||0);if(!name)throw new Error('Enter a milestone name.');if(amount<=0)throw new Error('Target spend must be greater than ₹0.');m.name=name;m.periodType=milestonePeriod.value;m.targetAmount=amount;if(m.periodType==='MEMBERSHIP_YEAR')m.purpose=milestonePurpose.value;else delete m.purpose;if(m.periodType==='CUSTOM'){const sd=milestoneStart.value,ed=milestoneEnd.value;if(!sd||!ed)throw new Error('Pick a start and end date.');if(ed<sd)throw new Error('End date must be after the start date.');m.startDate=sd;m.endDate=ed}else{delete m.startDate;delete m.endDate}await put('milestones',m);milestoneDialog.close();await load();toast(milestoneId?'✓ Milestone updated':'✓ Milestone added');if(cardDetailOpen())openCard(cardId)}catch(err){toast('Could not save milestone: '+err.message)}finally{b.disabled=false;b.textContent=milestoneForm.dataset.milestoneId?'Save Changes':'Add Milestone'}};
 
 cardForm.onsubmit=async e=>{
   e.preventDefault();const b=document.getElementById('saveCard');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';
@@ -760,8 +792,8 @@ txnForm.onsubmit=async e=>{
   finally{b.disabled=false;b.textContent=txnForm.dataset.txnId?'Save Changes':'Add Transaction'}
 };
 function openRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;refundForm.dataset.txnId=txnId;setDateField(refundForm.refundDate,t.refundDate||today());const c=state.cards.find(x=>x.id===t.cardId);refundSummary.innerHTML=`<div class="cardmain"><div><div class="cardname">${esc(t.merchant)}</div><div class="meta">${esc(c?bankName(c.bankId):'Unknown bank')} · ${esc(c?.name||'Unknown card')} · ${esc(displayDate(t.date))}</div></div><strong>${money(t.amount)}</strong></div>`;refundDialog.showModal()}
-refundForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveRefund');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const t=state.transactions.find(x=>x.id===refundForm.dataset.txnId);if(!t)throw new Error('Transaction not found.');t.status='REFUNDED';t.refundDate=dateForStorage(refundForm.refundDate.value);await put('transactions',t);refundDialog.close();await load();toast('✓ Transaction marked refunded');if(detailDialog.open)openCard(t.cardId)}catch(err){toast('Could not mark refund: '+err.message)}finally{b.disabled=false;b.textContent='Mark Refunded'}};
-async function undoRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;t.status='COMPLETED';t.refundDate='';await put('transactions',t);await load();toast('✓ Refund removed');if(detailDialog.open)openCard(t.cardId)};
+refundForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById('saveRefund');if(b.disabled)return;b.disabled=true;b.textContent='Saving…';try{const t=state.transactions.find(x=>x.id===refundForm.dataset.txnId);if(!t)throw new Error('Transaction not found.');t.status='REFUNDED';t.refundDate=dateForStorage(refundForm.refundDate.value);await put('transactions',t);refundDialog.close();await load();toast('✓ Transaction marked refunded');if(cardDetailOpen())openCard(t.cardId)}catch(err){toast('Could not mark refund: '+err.message)}finally{b.disabled=false;b.textContent='Mark Refunded'}};
+async function undoRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;t.status='COMPLETED';t.refundDate='';await put('transactions',t);await load();toast('✓ Refund removed');if(cardDetailOpen())openCard(t.cardId)};
 search.oninput=render;statusFilter.onchange=render;txnSearch.oninput=renderTransactions;msSort.onchange=()=>{localStorage.setItem('cardly-ms-sort',msSort.value);render()};msCount.onchange=()=>{localStorage.setItem('cardly-ms-count',msCount.value);render()};theme.onclick=()=>{const d=document.documentElement;d.dataset.theme=d.dataset.theme==='dark'?'light':'dark';localStorage.setItem('cardly-theme',d.dataset.theme)};document.documentElement.dataset.theme=localStorage.getItem('cardly-theme')||'light';
 const supportsDirectFileAccess='showOpenFilePicker'in window&&'showSaveFilePicker'in window;
 document.getElementById('openDataFile').onclick=()=>chooseDataFile(false);document.getElementById('createDataFile').onclick=()=>chooseDataFile(true);document.getElementById('resumeDataFile').onclick=reopenLastDataFile;document.getElementById('importDataFile').onclick=()=>document.getElementById('dataFileInput').click();document.getElementById('dataFileInput').onchange=e=>{const file=e.target.files[0];if(file)importDataFile(file);e.target.value=''};document.getElementById('exportDataFile').onclick=exportMobileData;
