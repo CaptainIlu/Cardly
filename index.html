@@ -83,6 +83,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
   </main>
   <main id="dashboard" hidden>
     <div class="hero"><div><div class="eyebrow">Personal credit card manager</div><div class="title">Dashboard</div><div class="sub">Your data stays on this device.</div></div><div class="hero-actions"><button class="btn" id="exportDataFile" hidden>Export Data</button></div></div>
+    <div class="chips" id="holderBar" hidden style="margin:0 0 12px"></div>
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="home">Home<span class="tabbadge" id="homeBadge" hidden></span></button>
       <button class="tab" data-tab="cards">Cards</button>
@@ -130,6 +131,11 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
   <main id="settingsPage" hidden>
     <div class="hero"><div><div class="eyebrow">Configuration</div><div class="title">Settings</div><div class="sub">Applies across all your cards.</div></div><div class="hero-actions"><button class="btn" id="settingsBack">← Back</button></div></div>
     <section class="section">
+      <div class="sectionhead"><div><div class="sectiontitle">Card holders</div><div class="muted">Track family members' cards separately. Switch between holders at the top of the dashboard; each holder gets their own totals, bills, milestones and AIS tracker.</div></div></div>
+      <div class="panel bankgrid" id="holderList"></div>
+      <div class="toolbar" style="margin-top:12px"><input class="search" id="newHolderName" placeholder="Add a holder (e.g. Mother)"><button class="btn primary" id="addHolderBtn">Add</button></div>
+    </section>
+    <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Banks</div><div class="muted">This list fills the bank dropdown when adding or editing a card. Cards of the same bank are grouped for the AIS tracker.</div></div></div>
       <div class="panel bankgrid" id="bankList"></div>
       <div class="toolbar" style="margin-top:12px"><input class="search" id="newBankName" placeholder="Add a bank (e.g. HDFC Bank)"><button class="btn primary" id="addBankBtn">Add</button></div>
@@ -148,6 +154,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 
 <dialog id="cardDialog"><div class="modal"><div class="modalhead"><h2 id="cardDialogTitle">Add credit card</h2><button class="iconbtn" onclick="cardDialog.close()">×</button></div>
 <form id="cardForm" class="form">
+<div class="field" id="cardHolderField"><label class="label">Holder</label><select name="holder" id="cardHolder_"></select></div>
 <div class="formrow"><div class="field"><label class="label">Bank</label><select name="bank" id="cardBank" required></select><input name="newBank" id="cardNewBank" placeholder="New bank name" style="margin-top:8px" hidden></div><div class="field"><label class="label">Card name</label><input name="name" required></div></div>
 <div class="field"><label class="label">Card type</label><select id="cardIsDebit" name="cardTypeSelect"><option value="CREDIT">Credit</option><option value="DEBIT">Debit</option></select></div>
 <div class="formrow"><div class="field"><label class="label">Network</label><select name="network"><option>Visa</option><option>Mastercard</option><option>Amex</option><option>RuPay</option></select></div><div class="field"><label class="label">Last 4 digits</label><input name="last4" maxlength="4" inputmode="numeric"></div></div>
@@ -262,12 +269,21 @@ function status(c){
 }
 function outstanding(c){return Math.max(0,Number(c.currentBill||0)-paidForCurrentBill(c))}
 function fyRange(){const t=today(),y=Number(t.slice(0,4)),m=Number(t.slice(5,7)),s=m>=4?y:y-1;return {start:`${s}-04-01`,end:`${s+1}-03-31`,label:`FY ${s}-${String(s+1).slice(2)}`}}
-function aisSummary(){
+
+function holders(){return (state.settings&&Array.isArray(state.settings.holders)&&state.settings.holders.length)?state.settings.holders:[{id:'me',name:'Me'}]}
+function holderName(id){const h=holders().find(x=>x.id===id);return h?h.name:'Me'}
+function cardHolder(c){return (c&&c.holderId&&holders().some(h=>h.id===c.holderId))?c.holderId:'me'}
+function activeHolder(){let v='me';try{v=localStorage.getItem('cardly-holder')||'me'}catch(e){}return holders().some(h=>h.id===v)?v:'me'}
+function hp(c){const h=cardHolder(c);return h==='me'?'':`[${holderName(h)}] `}
+function withHolder(fn,holderId){const hid=holderId||activeHolder(),keep={cards:state.cards,milestones:state.milestones,transactions:state.transactions};const cards=keep.cards.filter(c=>cardHolder(c)===hid),ids=new Set(cards.map(c=>c.id));state.cards=cards;state.milestones=keep.milestones.filter(m=>ids.has(m.cardId));state.transactions=keep.transactions.filter(t=>ids.has(t.cardId));try{return fn()}finally{state.cards=keep.cards;state.milestones=keep.milestones;state.transactions=keep.transactions}}
+function setHolder(id){try{localStorage.setItem('cardly-holder',id)}catch(e){}render()}
+function renderHolderBar(){const el=document.getElementById('holderBar');if(!el)return;const hs=holders();if(hs.length<2){el.hidden=true;el.innerHTML='';return}el.hidden=false;const a=activeHolder();el.innerHTML=hs.map(h=>`<button class="filterchip${a===h.id?' active':''}" onclick="setHolder('${h.id}')">${esc(h.name)}</button>`).join('')}
+function aisSummary(holderId){
   const fy=fyRange(),groups=new Map();
-  state.cards.forEach(c=>{if(c.cardType==='DEBIT')return;const bankId=c.bankId;if(!bankId)return;if(!groups.has(bankId))groups.set(bankId,{bankId,bankName:bankName(bankId),perCard:[],total:0});const paid=state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.date>=fy.start&&t.date<=fy.end).reduce((a,t)=>a+Number(t.amount),0);const g=groups.get(bankId);g.perCard.push({card:c,paid});g.total+=paid});
+  state.cards.forEach(c=>{if(holderId&&cardHolder(c)!==holderId)return;if(c.cardType==='DEBIT')return;const bankId=c.bankId;if(!bankId)return;if(!groups.has(bankId))groups.set(bankId,{bankId,bankName:bankName(bankId),perCard:[],total:0});const paid=state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.date>=fy.start&&t.date<=fy.end).reduce((a,t)=>a+Number(t.amount),0);const g=groups.get(bankId);g.perCard.push({card:c,paid});g.total+=paid});
   return [...groups.values()].filter(g=>g.total>0||g.perCard.some(x=>x.card.active!==false)).map(g=>{g.pct=g.total/aisLimit()*100;g.level=g.pct>=100?'crossed':g.pct>=aisWarnPct()?'warn':'ok';return g}).sort((a,b)=>b.total-a.total);
 }
-function aisForCard(c){return aisSummary().find(g=>g.bankId===c.bankId)}
+function aisForCard(c){return aisSummary(cardHolder(c)).find(g=>g.bankId===c.bankId)}
 function aisMessage(g){return g.level==='crossed'?`${g.bankName}: ${money(g.total)} paid this FY — at or above the ${money(aisLimit())} reporting limit`:`${g.bankName}: ${money(g.total)} paid this FY — ${Math.round(g.pct)}% of the ${money(aisLimit())} reporting limit (${money(aisLimit()-g.total)} left)`}
 function feeDueSoon(c){if(c.lifetimeFree||!c.renewalDate)return false;const d=daysUntil(nextRenewalDate(c));return d!==null&&d>=0&&d<=feeRenewalDays()}
 function setTab(t){
@@ -408,7 +424,8 @@ function renderInsights(){
   <div class="panel inspanel"><h3>Monthly ${isR?'rewards':'spend'}</h3><div class="insdetail">${detail}</div><div class="insbars">${bars}</div><div class="insx">${xl}</div></div>
   <div class="panel inspanel"><h3>${isR?'Where rewards came from':'Where it went'}</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div>`;
 }
-function render(){renderHome();renderCards();renderTransactions();renderInsights();renderAis();updateNotifyBtn();maybeSendNotifications()}
+['renderHome','renderCards','renderTransactions','renderInsights','renderAis'].forEach(n=>{const f=window[n];window[n]=function(){return withHolder(f)}});
+function render(){renderHolderBar();renderHome();renderCards();renderTransactions();renderInsights();renderAis();updateNotifyBtn();maybeSendNotifications()}
 async function load(){const settingsChanged=ensureSettings(),banksChanged=ensureBanks();if(settingsChanged||banksChanged){try{await saveDataFile()}catch{}}for(const c of [...state.cards]){let changed=false;if(c.billDate==null){c.billDate=c.paymentDate||today();changed=true}if(c.paidAmount!=null&&Number(c.paidAmount)>0&&!c.legacyPaymentMigrated){const legacy={id:id(),cardId:c.id,date:c.paymentDate||today(),merchant:'Bill Payment',amount:Number(c.paidAmount),type:'PAYMENT',status:'COMPLETED',refundDate:''};state.transactions.push(legacy);await put('transactions',legacy);c.legacyPaymentMigrated=true;changed=true}if(changed)await put('cards',c)}for(const t of [...state.transactions]){let changed=false;if(!t.type)t.type='PURCHASE',changed=true;if(!t.status){t.status='COMPLETED';changed=true}if(t.refundDate==null){t.refundDate='';changed=true}if(changed)await put('transactions',t)}render()}
 function setFileError(message=''){document.getElementById('dataFileError').textContent=message}
 function openHandleDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open('cardly-file-link',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('settings'))d.createObjectStore('settings');if(!d.objectStoreNames.contains('mobileData'))d.createObjectStore('mobileData')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
@@ -441,13 +458,13 @@ function maybeSendNotifications(force=false){
   if(seen.date!==todayKey)seen={date:todayKey,ids:[]};
   const fire=(dedupeId,title,body)=>{if(seen.ids.includes(dedupeId)&&!force)return;try{new Notification(title,{body,tag:dedupeId})}catch{}if(!seen.ids.includes(dedupeId))seen.ids.push(dedupeId)};
   state.cards.filter(c=>c.active!==false).forEach(c=>{
-    if(status(c)!=='paid'){const d=daysUntil(dueDate(c));if(d!==null&&d<=DUE_REMINDER_DAYS){const label=d<0?`overdue by ${-d} day${-d===1?'':'s'}`:d===0?'due today':`due in ${d} day${d===1?'':'s'}`;fire(`due-${c.id}-${todayKey}`,`${bankName(c.bankId)} · ${c.name} bill ${label}`,`Outstanding ${money(outstanding(c))}`)}}
-    if(feeDueSoon(c)){const rd=nextRenewalDate(c),d=daysUntil(rd);fire(`fee-${c.id}-${rd}`,`${bankName(c.bankId)} · ${c.name} renews in ${d} day${d===1?'':'s'}`,`Annual fee ${money(c.annualFee)} on ${displayDate(rd)}`)}
-    if(needsBillUpdate(c)){const sd=latestStatementDate(c);fire(`billupdate-${c.id}-${sd}`,`${bankName(c.bankId)} · ${c.name}: add the latest bill`,`Statement date ${displayDate(sd)} — not updated after two days`)}
+    if(status(c)!=='paid'){const d=daysUntil(dueDate(c));if(d!==null&&d<=DUE_REMINDER_DAYS){const label=d<0?`overdue by ${-d} day${-d===1?'':'s'}`:d===0?'due today':`due in ${d} day${d===1?'':'s'}`;fire(`due-${c.id}-${todayKey}`,`${hp(c)}${bankName(c.bankId)} · ${c.name} bill ${label}`,`Outstanding ${money(outstanding(c))}`)}}
+    if(feeDueSoon(c)){const rd=nextRenewalDate(c),d=daysUntil(rd);fire(`fee-${c.id}-${rd}`,`${hp(c)}${bankName(c.bankId)} · ${c.name} renews in ${d} day${d===1?'':'s'}`,`Annual fee ${money(c.annualFee)} on ${displayDate(rd)}`)}
+    if(needsBillUpdate(c)){const sd=latestStatementDate(c);fire(`billupdate-${c.id}-${sd}`,`${hp(c)}${bankName(c.bankId)} · ${c.name}: add the latest bill`,`Statement date ${displayDate(sd)} — not updated after two days`)}
   });
   let aisSeen;try{aisSeen=JSON.parse(localStorage.getItem('cardly-ais-seen')||'[]')}catch{aisSeen=[]}
   const fyLabel=fyRange().label;
-  aisSummary().filter(g=>g.level!=='ok').forEach(g=>{const aid=`ais-${g.bankId}-${fyLabel}-${g.level}`;if(aisSeen.includes(aid)&&!force)return;try{new Notification(g.level==='crossed'?`${g.bankName}: AIS limit reached`:`${g.bankName}: nearing AIS limit`,{body:aisMessage(g),tag:aid})}catch{}if(!aisSeen.includes(aid))aisSeen.push(aid)});
+  holders().flatMap(h=>aisSummary(h.id).map(g=>Object.assign(g,{hid:h.id,hpre:h.id==='me'?'':`[${h.name}] `}))).filter(g=>g.level!=='ok').forEach(g=>{const aid=`ais-${g.hid==='me'?'':g.hid+'-'}${g.bankId}-${fyLabel}-${g.level}`;if(aisSeen.includes(aid)&&!force)return;try{new Notification(g.level==='crossed'?`${g.hpre}${g.bankName}: AIS limit reached`:`${g.hpre}${g.bankName}: nearing AIS limit`,{body:aisMessage(g),tag:aid})}catch{}if(!aisSeen.includes(aid))aisSeen.push(aid)});
   localStorage.setItem('cardly-ais-seen',JSON.stringify(aisSeen));
   localStorage.setItem(NOTIFY_SEEN_KEY,JSON.stringify(seen));
 }
@@ -484,6 +501,7 @@ function ensureSettings(){
   if(!(Number(s.billGraceDays)>=0)){s.billGraceDays=2;changed=true}
   if(!(Number(s.feeRenewalDays)>=1)){s.feeRenewalDays=21;changed=true}
   if(!(Number(s.renewalListDays)>=1)){s.renewalListDays=90;changed=true}
+  if(!Array.isArray(s.holders)||!s.holders.some(h=>h&&h.id==='me')){s.holders=[{id:'me',name:'Me'},...(Array.isArray(s.holders)?s.holders.filter(h=>h&&h.id&&h.id!=='me'&&h.name):[])];changed=true}
   return changed;
 }
 function ensureBanks(){
@@ -528,6 +546,7 @@ cardBank.onchange=()=>{const isNew=cardBank.value==='__new__';cardNewBank.hidden
 function bankFromForm(f){let bankId=String(f.get('bank')||'').trim();if(bankId==='__new__'){const name=String(f.get('newBank')||'').trim();if(!name)throw new Error('Enter the new bank name.');return addBankEntity(name).id}if(!bankId)throw new Error('Select a bank.');if(!bankById(bankId))throw new Error('Select a bank.');return bankId}
 function showView(v){document.getElementById('dashboard').hidden=v!=='dashboard';document.getElementById('settingsPage').hidden=v!=='settings';if(v==='settings')renderSettings();else render();window.scrollTo(0,0)}
 function renderSettings(){
+  renderHolderSettings();
   const counts=new Map();state.cards.forEach(c=>{if(c.bankId)counts.set(c.bankId,(counts.get(c.bankId)||0)+1)});
   const banks=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
   document.getElementById('bankList').innerHTML=banks.length?banks.map(b=>{const n=counts.get(b.id)||0;return `<span class="bankchip">${bankTag(b.id)}<span>${esc(b.name)}</span><span class="bc">${n}</span><button class="chipbtn" title="Set logo URL" onclick="editBankLogo('${b.id}')">🖼</button><button class="chipbtn" title="Rename" onclick="renameBank('${b.id}')">✎</button>${n?'':`<button class="chipbtn" title="Remove (no cards use it)" onclick="removeBank('${b.id}')">✕</button>`}</span>`}).join(''):'<span class="muted">No banks yet. Add one below.</span>';
@@ -540,6 +559,13 @@ async function editBankLogo(bankId){const b=bankById(bankId);if(!b)return;const 
 async function removeBank(bankId){if(state.cards.some(c=>c.bankId===bankId)){toast('Cards still use this bank.');return}state.banks=state.banks.filter(b=>b.id!==bankId);await commitSettings('✓ Bank removed')}
 settingsBtn.onclick=()=>showView('settings');
 settingsBack.onclick=()=>showView('dashboard');
+
+function populateHolderSelect(sel){cardHolder_.innerHTML=holders().map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('');cardHolder_.value=holders().some(h=>h.id===sel)?sel:'me';document.getElementById('cardHolderField').hidden=holders().length<2}
+function renderHolderSettings(){const counts=new Map();state.cards.forEach(c=>counts.set(cardHolder(c),(counts.get(cardHolder(c))||0)+1));holderList.innerHTML=holders().map(h=>`<span class="bankchip"><span>${esc(h.name)}</span><span class="bc">${counts.get(h.id)||0}</span><button class="chipbtn" title="Rename" onclick="renameHolder('${h.id}')">✎</button>${h.id==='me'?'':`<button class="chipbtn" title="Remove" onclick="removeHolder('${h.id}')">✕</button>`}</span>`).join('')}
+async function addHolder(){const name=String(newHolderName.value||'').trim();if(!name)return;if(holders().some(h=>h.name.toLowerCase()===name.toLowerCase())){toast('That holder already exists.');return}state.settings.holders=[...holders(),{id:id(),name}];newHolderName.value='';await commitSettings('✓ Holder added');render()}
+async function renameHolder(hid){const h=holders().find(x=>x.id===hid);if(!h)return;const name=String(prompt('Rename holder',h.name)||'').trim();if(!name||name===h.name)return;if(holders().some(x=>x.id!==hid&&x.name.toLowerCase()===name.toLowerCase())){toast('That name is already used.');return}h.name=name;await commitSettings('✓ Holder renamed');render()}
+async function removeHolder(hid){if(state.cards.some(c=>cardHolder(c)===hid)){toast('Move or delete this holder\'s cards first.');return}state.settings.holders=holders().filter(h=>h.id!==hid);if(activeHolder()===hid)try{localStorage.setItem('cardly-holder','me')}catch(e){}await commitSettings('✓ Holder removed');render()}
+addHolderBtn.onclick=addHolder;newHolderName.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addHolder()}};
 addBankBtn.onclick=async()=>{const v=newBankName.value;await addBankFromSetting(v);newBankName.value=''};
 newBankName.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addBankBtn.click()}};
 aisLimitInput.onchange=async()=>{const v=Number(aisLimitInput.value);if(!(v>0)){toast('Enter a limit above ₹0.');renderSettings();return}state.settings.aisLimit=v;await commitSettings('✓ AIS limit saved')};
@@ -583,7 +609,7 @@ function applyCardTypeVisibility(){
   const billRow=document.getElementById('cardBillAmountRow');if(billRow)billRow.hidden=isDebit;
 }
 cardIsDebit.onchange=applyCardTypeVisibility;
-addCard.onclick=()=>{cardForm.reset();cardForm.dataset.cardId='';cardDialogTitle.textContent='Add credit card';cardCreateOnly.hidden=false;saveCard.textContent='Save Card';milestoneInputs.innerHTML='';populateBankSelect('');cardLifetimeFree.checked=false;feeDetailsGroup.hidden=false;cardIsDebit.value='CREDIT';applyCardTypeVisibility();cardDialog.showModal()}
+addCard.onclick=()=>{cardForm.reset();populateHolderSelect(activeHolder());cardForm.dataset.cardId='';cardDialogTitle.textContent='Add credit card';cardCreateOnly.hidden=false;saveCard.textContent='Save Card';milestoneInputs.innerHTML='';populateBankSelect('');cardLifetimeFree.checked=false;feeDetailsGroup.hidden=false;cardIsDebit.value='CREDIT';applyCardTypeVisibility();cardDialog.showModal()}
 function openEditCard(cardId){
   const c=state.cards.find(x=>x.id===cardId);if(!c)return;
   cardForm.reset();milestoneInputs.innerHTML='';
@@ -591,7 +617,7 @@ function openEditCard(cardId){
   cardDialogTitle.textContent='Edit card';
   cardCreateOnly.hidden=true;
   saveCard.textContent='Save Changes';
-  populateBankSelect(c.bankId);
+  populateBankSelect(c.bankId);populateHolderSelect(cardHolder(c));
   cardForm.elements.name.value=c.name||'';
   cardForm.network.value=c.network||'Visa';
   cardForm.last4.value=c.last4||'';
@@ -665,12 +691,12 @@ function openPayment(cardId,markPaid=false){
 }
 function openTxnFor(cardId){
   txnForm.reset(); txnForm.dataset.txnId=''; deleteTxnBtn.style.display='none'; txnDialogTitle.textContent='Add transaction'; saveTxn.textContent='Add Transaction';
-  setDateField(txnForm.date,today()); txnCard.innerHTML=state.cards.filter(c=>c.active!==false).map(c=>`<option value="${c.id}" ${c.id===cardId?'selected':''}>${esc(bankName(c.bankId))} · ${esc(c.name)}</option>`).join(''); txnDialog.showModal();
+  setDateField(txnForm.date,today()); txnCard.innerHTML=state.cards.filter(c=>c.active!==false&&(cardHolder(c)===activeHolder()||c.id===cardId)).map(c=>`<option value="${c.id}" ${c.id===cardId?'selected':''}>${esc(bankName(c.bankId))} · ${esc(c.name)}</option>`).join(''); txnDialog.showModal();
 }
 function openEditTxn(txnId){
   const t=state.transactions.find(x=>x.id===txnId);if(!t)return;
   txnForm.reset(); txnForm.dataset.txnId=txnId; deleteTxnBtn.style.display=''; txnDialogTitle.textContent='Edit transaction'; saveTxn.textContent='Save Changes';
-  txnCard.innerHTML=state.cards.filter(c=>c.active!==false||c.id===t.cardId).map(c=>`<option value="${c.id}" ${c.id===t.cardId?'selected':''}>${esc(bankName(c.bankId))} · ${esc(c.name)}</option>`).join('');
+  txnCard.innerHTML=state.cards.filter(c=>(c.active!==false&&cardHolder(c)===activeHolder())||c.id===t.cardId).map(c=>`<option value="${c.id}" ${c.id===t.cardId?'selected':''}>${esc(bankName(c.bankId))} · ${esc(c.name)}</option>`).join('');
   setDateField(txnForm.date,t.date); txnForm.merchant.value=t.merchant; txnForm.amount.value=Number(t.amount);
   txnDialog.showModal();
 }
@@ -702,13 +728,13 @@ cardForm.onsubmit=async e=>{
     const f=new FormData(e.target),editingId=cardForm.dataset.cardId,fee=readFeeFields(f),bankId=bankFromForm(f),cardType=f.get('cardTypeSelect')==='DEBIT'?'DEBIT':'CREDIT';
     if(editingId){
       const c=state.cards.find(x=>x.id===editingId);if(!c)throw new Error('Card not found.');
-      c.bankId=bankId;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.cardType=cardType;c.statementDay=cardType==='DEBIT'?0:Number(f.get('statementDay'));c.dueDay=cardType==='DEBIT'?0:Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);
+      c.holderId=f.get('holder')||'me';c.bankId=bankId;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.cardType=cardType;c.statementDay=cardType==='DEBIT'?0:Number(f.get('statementDay'));c.dueDay=cardType==='DEBIT'?0:Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);
       c.lifetimeFree=fee.lifetimeFree;c.annualFee=fee.annualFee;c.renewalDate=fee.renewalDate;
       await put('cards',c);
       await syncFeeWaiverMilestone(c,fee.waiverAmt);
       cardDialog.close();await load();toast('✓ Card updated');openCard(c.id);
     }else{
-      const card={id:id(),bankId:bankId,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),cardType,statementDay:cardType==='DEBIT'?0:Number(f.get('statementDay')),dueDay:cardType==='DEBIT'?0:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),currentBill:cardType==='DEBIT'?0:Number(f.get('currentBill')||0),billDate:cardType==='DEBIT'?'':(f.get('billDate')?dateForStorage(f.get('billDate')):today()),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
+      const card={id:id(),holderId:f.get('holder')||activeHolder(),bankId:bankId,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),cardType,statementDay:cardType==='DEBIT'?0:Number(f.get('statementDay')),dueDay:cardType==='DEBIT'?0:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),currentBill:cardType==='DEBIT'?0:Number(f.get('currentBill')||0),billDate:cardType==='DEBIT'?'':(f.get('billDate')?dateForStorage(f.get('billDate')):today()),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
       await put('cards',card);
       await syncFeeWaiverMilestone(card,fee.waiverAmt);
       for(const r of document.querySelectorAll('.milestone-edit'))await put('milestones',{id:id(),cardId:card.id,name:r.querySelector('.mname').value,periodType:r.querySelector('.mtype').value,startDate:r.querySelector('.mstart').value||undefined,endDate:r.querySelector('.mend').value||undefined,targetAmount:Number(r.querySelector('.mtarget').value),active:true});
