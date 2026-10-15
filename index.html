@@ -53,6 +53,9 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .sectiontitle{font-size:17px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}.sectiontitle::before{content:"";width:4px;height:18px;border-radius:2px;background:var(--accent);flex:none}.sectiontitle .muted{font-size:13px;font-weight:600}.sectionhead .muted:not(.sectiontitle .muted){font-size:13px}.sectionhead>div>.muted{margin:3px 0 0 14px}
 .attgroup .sectionhead{padding-bottom:8px;border-bottom:1px solid var(--line)}
 #homeAttention>.sectionhead .sectiontitle{font-size:20px}
+.homebar[hidden]{display:none}.homebar{display:flex;gap:8px;overflow-x:auto;margin:0 0 14px;scrollbar-width:none}.homebar::-webkit-scrollbar{display:none}.homebar .filterchip{flex:none}
+@media(min-width:900px){#tab-home[data-layout=alerts] #homePrimary,#tab-home[data-layout=slim] #homePrimary{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}}
+.attgroup.collapsible>.sectionhead{cursor:pointer;user-select:none}.attgroup.collapsible>.sectionhead::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s}.attgroup.collapsible.isclosed>.sectionhead::after{transform:rotate(-90deg)}.attgroup.isclosed>.attrows{display:none}.attgroup.isclosed{margin-bottom:12px}
 .filterchip{background:var(--panel);font-weight:600;padding:7px 14px}.filterchip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:12px 0}.chips::-webkit-scrollbar{display:none}.filterchip{flex:none}
 .monthhead{padding:6px 12px;background:var(--soft);border-radius:8px}
@@ -115,15 +118,18 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
         <div class="stat"><strong id="unpaidCount">0</strong><span>Unpaid bills</span></div>
         <div class="stat"><strong id="dueTotal">₹0</strong><span>Current dues</span></div>
       </div>
+      <div id="homeLayoutBar" class="homebar" hidden></div>
       <div id="homeAttention"></div>
+      <div id="homePrimary"><div id="msWrap">
       <div class="msbar"><label class="msfield"><span>Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select></label><label class="msfield"><span>Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></label></div>
-      <div id="msSection"></div>
-      <div id="billSection"></div>
+      <div id="msSection"></div></div>
+      <div id="billSection"></div></div>
       <div id="utilSection"></div>
       <div id="renewalSection"></div>
     </div>
 
     <div class="tabpane" id="tab-cards" hidden>
+      <div id="cardsExtras"></div>
       <div class="toolbar"><input class="search" id="search" placeholder="Search cards..."><select id="statusFilter"><option value="all">All status</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select><button class="btn primary addbtn" id="addCard" title="Add card" aria-label="Add card">+</button></div>
       <div class="chips" id="cardBankChips"></div>
       <div id="cards" class="list"></div>
@@ -154,6 +160,10 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 
   <main id="settingsPage" hidden>
     <div class="hero"><div><div class="eyebrow">Configuration</div><div class="title">Settings</div><div class="sub">Applies across all your cards.</div></div><div class="hero-actions"><button class="btn" id="settingsBack">← Back</button></div></div>
+    <section class="section">
+      <div class="sectionhead"><div><div class="sectiontitle">Home layout</div><div class="muted">Bills and Milestones always stay front and centre.</div></div></div>
+      <div class="panel" style="padding:14px"><select id="homeLayoutSelect"><option value="alerts">Two columns + Alerts chips</option><option value="tabs">Segmented tabs</option><option value="collapse">Collapsible sections</option><option value="slim">Slim home (extras on Cards tab)</option><option value="classic">Classic (everything)</option></select></div>
+    </section>
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Card details view</div><div class="muted">How a card opens when you tap it.</div></div></div>
       <div class="panel" style="padding:14px"><select id="cardViewSelect"><option value="page">Full page</option><option value="dialog">Pop-up dialog</option></select></div>
@@ -593,7 +603,7 @@ cardBank.onchange=()=>{const isNew=cardBank.value==='__new__';cardNewBank.hidden
 function bankFromForm(f){let bankId=String(f.get('bank')||'').trim();if(bankId==='__new__'){const name=String(f.get('newBank')||'').trim();if(!name)throw new Error('Enter the new bank name.');return addBankEntity(name).id}if(!bankId)throw new Error('Select a bank.');if(!bankById(bankId))throw new Error('Select a bank.');return bankId}
 function showView(v){document.getElementById('cardPage').hidden=true;document.getElementById('dashboard').hidden=v!=='dashboard';document.getElementById('settingsPage').hidden=v!=='settings';if(v==='settings')renderSettings();else render();window.scrollTo(0,0)}
 function renderSettings(){
-  renderHolderSettings();cardViewSelect.value=cardViewMode();
+  renderHolderSettings();cardViewSelect.value=cardViewMode();homeLayoutSelect.value=homeLayout();
   const counts=new Map();state.cards.forEach(c=>{if(c.bankId)counts.set(c.bankId,(counts.get(c.bankId)||0)+1)});
   const banks=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
   document.getElementById('bankList').innerHTML=banks.length?banks.map(b=>{const n=counts.get(b.id)||0;return `<span class="bankchip">${bankTag(b.id)}<span>${esc(b.name)}</span><span class="bc">${n}</span><button class="chipbtn" title="Set logo URL" onclick="editBankLogo('${b.id}')">🖼</button><button class="chipbtn" title="Rename" onclick="renameBank('${b.id}')">✎</button>${n?'':`<button class="chipbtn" title="Remove (no cards use it)" onclick="removeBank('${b.id}')">✕</button>`}</span>`}).join(''):'<span class="muted">No banks yet. Add one below.</span>';
@@ -612,6 +622,7 @@ function renderHolderSettings(){const counts=new Map();state.cards.forEach(c=>co
 async function addHolder(){const name=String(newHolderName.value||'').trim();if(!name)return;if(holders().some(h=>h.name.toLowerCase()===name.toLowerCase())){toast('That holder already exists.');return}state.settings.holders=[...holders(),{id:id(),name}];newHolderName.value='';await commitSettings('✓ Holder added');render()}
 async function renameHolder(hid){const h=holders().find(x=>x.id===hid);if(!h)return;const name=String(prompt('Rename holder',h.name)||'').trim();if(!name||name===h.name)return;if(holders().some(x=>x.id!==hid&&x.name.toLowerCase()===name.toLowerCase())){toast('That name is already used.');return}h.name=name;await commitSettings('✓ Holder renamed');render()}
 async function removeHolder(hid){if(state.cards.some(c=>cardHolder(c)===hid)){toast('Move or delete this holder\'s cards first.');return}state.settings.holders=holders().filter(h=>h.id!==hid);if(activeHolder()===hid)try{localStorage.setItem('cardly-holder','me')}catch(e){}await commitSettings('✓ Holder removed');render()}
+homeLayoutSelect.onchange=async()=>{state.settings.homeLayout=homeLayoutSelect.value;await commitSettings('✓ Saved');try{renderHome()}catch(e){}};
 cardViewSelect.onchange=async()=>{state.settings.cardView=cardViewSelect.value;await commitSettings('✓ Saved')};
 addHolderBtn.onclick=addHolder;newHolderName.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addHolder()}};
 addBankBtn.onclick=async()=>{const v=newBankName.value;await addBankFromSetting(v);newBankName.value=''};
@@ -692,6 +703,41 @@ addTxn.onclick=()=>openTxnFor(state.cards.find(c=>c.active!==false)?.id||'')
 
 
 let cardPageScrollY=0;
+function homeLayout(){const v=state.settings&&state.settings.homeLayout;return ['classic','alerts','tabs','collapse','slim'].includes(v)?v:'alerts'}
+let homeExtra=null;
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function applyHomeLayout(){
+  const $=id=>document.getElementById(id),L=homeLayout(),tab=$('tab-home');tab.dataset.layout=L;
+  const S={attention:$('homeAttention'),milestones:$('msWrap'),bills:$('billSection'),limits:$('utilSection'),renewals:$('renewalSection')};
+  const lab={attention:'Attention',bills:'Bills',milestones:'Milestones',limits:'Limits',renewals:'Renewals'};
+  const cnt=k=>S[k].querySelectorAll('.attrow').length;
+  const bar=$('homeLayoutBar');bar.innerHTML='';bar.hidden=true;
+  Object.values(S).forEach(e=>{e.hidden=false});
+  document.querySelectorAll('.attgroup').forEach(g=>{g.classList.remove('collapsible','isclosed');const h=g.querySelector('.sectionhead');if(h)h.onclick=null});
+  if(L==='slim'){$('cardsExtras').appendChild(S.limits);$('cardsExtras').appendChild(S.renewals)}
+  else{tab.appendChild(S.limits);tab.appendChild(S.renewals)}
+  const chips=(keys,active,onpick)=>{bar.hidden=false;bar.innerHTML=keys.map(k=>`<button class="chip filterchip${k===active?' active':''}" data-k="${k}">${lab[k]}${cnt(k)?` · ${cnt(k)}`:''}</button>`).join('');bar.querySelectorAll('button').forEach(b=>b.onclick=()=>onpick(b.dataset.k))};
+  if(L==='alerts'){
+    const ex=['attention','limits','renewals'].filter(k=>cnt(k)>0);if(!ex.includes(homeExtra))homeExtra=null;
+    ['attention','limits','renewals'].forEach(k=>{S[k].hidden=k!==homeExtra});
+    if(ex.length)chips(ex,homeExtra,k=>{homeExtra=homeExtra===k?null:k;applyHomeLayout()});
+  }else if(L==='tabs'){
+    const keys=['bills','milestones','attention','limits','renewals'];let t=lsGet('cardly-home-tab','bills');if(!keys.includes(t))t='bills';
+    keys.forEach(k=>{S[k].hidden=k!==t});chips(keys,t,k=>{lsSet('cardly-home-tab',k);applyHomeLayout()});
+  }else if(L==='collapse'){
+    let st={};try{st=JSON.parse(lsGet('cardly-home-collapsed','{}'))||{}}catch(e){}
+    Object.entries(S).forEach(([k,el])=>el.querySelectorAll('.attgroup').forEach(g=>{
+      const t=(g.querySelector('.sectiontitle')?.firstChild?.textContent||'').trim(),id=k+':'+t,def=/^(Limit utilisation|Upcoming renewals|Annual fee renewals|AIS reporting)/.test(t);
+      const closed=id in st?st[id]:def;g.classList.add('collapsible');g.classList.toggle('isclosed',closed);
+      g.querySelector('.sectionhead').onclick=()=>{st[id]=!g.classList.contains('isclosed');lsSet('cardly-home-collapsed',JSON.stringify(st));applyHomeLayout()};
+    }));
+  }else if(L==='slim'){
+    const n=cnt('limits'),r=cnt('renewals');
+    if(n||r){bar.hidden=false;bar.innerHTML=`<button class="chip filterchip" data-go="1">${n?`Limits · ${n}`:''}${n&&r?'  ':''}${r?`Renewals · ${r}`:''} →  see on Cards tab</button>`;bar.firstChild.onclick=()=>{setTab('cards');window.scrollTo(0,0)}}
+  }
+}
+{const f=window.renderHome;window.renderHome=function(){const r=f.apply(this,arguments);applyHomeLayout();return r}}
 function cardViewMode(){return (state.settings&&state.settings.cardView==='dialog')?'dialog':'page'}
 function cardPageOpen(){return !document.getElementById('cardPage').hidden}
 function cardDetailOpen(){return detailDialog.open||cardPageOpen()}
