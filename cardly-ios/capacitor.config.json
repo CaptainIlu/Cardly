@@ -1,0 +1,11 @@
+{
+  "appId": "com.example.cardly",
+  "appName": "Cardly",
+  "webDir": "www",
+  "server": {
+    "url": "https://YOURNAME.github.io/YOURREPO/"
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}
