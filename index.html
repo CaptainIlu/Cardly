@@ -162,10 +162,6 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
   <main id="settingsPage" hidden>
     <div class="hero"><div><div class="eyebrow">Configuration</div><div class="title">Settings</div><div class="sub">Applies across all your cards.</div></div><div class="hero-actions"><button class="btn" id="settingsBack">← Back</button></div></div>
     <section class="section">
-      <div class="sectionhead"><div><div class="sectiontitle">Google Drive sync</div><div class="muted">Keeps cardly-data.json in your Drive so every device sees the same data.</div></div></div>
-      <div class="panel" style="padding:14px"><div class="muted" id="driveStatusText" style="margin-bottom:10px"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="driveConnectBtn">Connect Google Drive</button><button class="btn" id="driveSyncNowBtn" hidden>Sync now</button><button class="btn" id="driveDisconnectBtn" hidden>Disconnect</button></div><div id="mirrorBox" hidden style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><div class="muted" id="mirrorStatus" style="margin-bottom:10px"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="mirrorChooseBtn">Choose backup file</button><button class="btn" id="mirrorAllowBtn" hidden>Allow access</button><button class="btn" id="mirrorStopBtn" hidden>Stop backup</button></div></div></div>
-    </section>
-    <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Home layout</div><div class="muted">Bills and Milestones always stay front and centre.</div></div></div>
       <div class="panel" style="padding:14px"><select id="homeLayoutSelect"><option value="alerts">Two columns + Alerts chips</option><option value="tabs">Segmented tabs</option><option value="collapse">Collapsible sections</option><option value="slim">Slim home (extras on Cards tab)</option><option value="classic">Classic (everything)</option></select></div>
     </section>
@@ -192,6 +188,10 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
       <div class="panel" style="padding:16px"><div class="formrow"><div class="field"><label class="label">Milestones ending within (days)</label><input id="milestoneSoonInput" type="number" min="1" step="1"></div><div class="field"><label class="label">Bill-update grace period (days)</label><input id="billGraceInput" type="number" min="0" step="1"></div></div>
       <div class="formrow" style="margin-top:12px"><div class="field"><label class="label">Fee renewals coming up within (days)</label><input id="feeRenewalInput" type="number" min="1" step="1"></div><div class="field"><label class="label">Upcoming renewals list shows next (days)</label><input id="renewalListInput" type="number" min="1" step="1"></div></div>
       <div class="formrow" style="margin-top:12px"><div class="field"><label class="label">Upcoming bills list shows next (days)</label><input id="billListInput" type="number" min="1" step="1"></div><div class="field"><label class="label">Flag limit utilisation above (%)</label><input id="utilInput" type="number" min="1" max="100" step="1"></div></div></div>
+    </section>
+    <section class="section">
+      <div class="sectionhead"><div><div class="sectiontitle">Google Drive sync</div><div class="muted">Keeps cardly-data.json in your Drive so every device sees the same data.</div></div></div>
+      <div class="panel" style="padding:14px"><div class="muted" id="driveStatusText" style="margin-bottom:10px"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="driveConnectBtn">Connect Google Drive</button><button class="btn" id="driveSyncNowBtn" hidden>Sync now</button><button class="btn" id="driveDisconnectBtn" hidden>Disconnect</button></div><div id="mirrorBox" hidden style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><div class="muted" id="mirrorStatus" style="margin-bottom:10px"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="mirrorChooseBtn">Choose backup file</button><button class="btn" id="mirrorAllowBtn" hidden>Allow access</button><button class="btn" id="mirrorStopBtn" hidden>Stop backup</button></div></div></div>
     </section>
   </main>
 </div>
