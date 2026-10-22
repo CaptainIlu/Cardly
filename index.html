@@ -58,7 +58,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .attgroup.collapsible>.sectionhead{cursor:pointer;user-select:none}.attgroup.collapsible>.sectionhead::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s}.attgroup.collapsible.isclosed>.sectionhead::after{transform:rotate(-90deg)}.attgroup.isclosed>.attrows{display:none}.attgroup.isclosed{margin-bottom:12px}
 .filterchip{background:var(--panel);font-weight:600;padding:7px 14px}.filterchip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:12px 0}.chips::-webkit-scrollbar{display:none}.filterchip{flex:none}
-.monthhead{padding:6px 12px;background:var(--soft);border-radius:8px}.list+.monthhead,.detail-section .panel+.monthhead{margin-top:22px}.detail-section .monthhead{margin-bottom:8px}.monthhead.today{background:var(--accent);color:#fff}.monthhead.today span{color:inherit!important}
+.monthhead{padding:6px 12px;background:var(--soft);border-radius:8px}.list+.monthhead,.detail-section .panel+.monthhead{margin-top:22px}.detail-section .monthhead{margin-bottom:8px}.monthhead+.monthhead{margin-top:8px}.monthhead.grp{cursor:pointer;user-select:none;display:flex;justify-content:space-between;gap:10px}.monthhead.grp:hover{filter:brightness(.97)}@media(hover:hover){.detail-section .panel>.row{transition:background .12s}.detail-section .panel>.row:hover{background:color-mix(in srgb,var(--accent) 9%,var(--panel))}}.monthhead.today{background:var(--accent);color:#fff}.monthhead.today span{color:inherit!important}
 .bankhead{padding:6px 12px;background:var(--soft);border-radius:8px}
 
 .inskpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}.inskpi{padding:12px;min-width:0}.inskpi .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.inskpi .v{font-size:clamp(14px,4.4vw,20px);white-space:nowrap;font-weight:800;margin-top:4px;letter-spacing:-.01em}.inskpi .s{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -423,6 +423,11 @@ function refundsOf(id){return state.transactions.filter(r=>r.type==='REFUND'&&r.
 function refundedAmt(t){if(t.status==='REFUNDED')return Number(t.amount)||0;return Math.min(Number(t.amount)||0,refundsOf(t.id).reduce((a,r)=>a+(Number(r.amount)||0),0))}
 function netAmount(t){return Math.max(0,(Number(t.amount)||0)-refundedAmt(t))}
 function rewardFor(t,c){if(t.type!=='PURCHASE')return 0;const rate=Number(c&&c.rewardRatePct||0);return rate>0?netAmount(t)*rate/100:0}
+const grpState={};
+function prevMonthKey(){const t=today();let y=Number(t.slice(0,4)),m=Number(t.slice(5,7))-1;if(m<1){m=12;y--}return y+'-'+String(m).padStart(2,'0')}
+function grpCollapsed(scope,key,force){if(force||key==='today')return false;const k=scope+'|'+key;if(k in grpState)return grpState[k];return key<prevMonthKey()}
+function toggleGrp(scope,key){grpState[scope+'|'+key]=!grpCollapsed(scope,key,false);if(scope.startsWith('card:'))openCard(scope.slice(5));else renderTransactions()}
+function grpHead(scope,key,label,totalHtml,count,collapsed){const tog=key!=='today';return `<div class="monthhead${key==='today'?' today':''}${tog?' grp':''}"${tog?` onclick="toggleGrp('${scope}','${key}')"`:''}><span>${tog?(collapsed?'▸ ':'▾ '):''}${label}${collapsed?` <span style="font-weight:500;opacity:.7">· ${count}</span>`:''}</span><span>${totalHtml}</span></div>`}
 function renderTransactions(){
   const cardsWithTxns=[...new Set(state.transactions.map(t=>t.cardId))].map(id=>state.cards.find(c=>c.id===id)).filter(Boolean).sort((a,b)=>bankName(a.bankId).localeCompare(bankName(b.bankId))||String(a.name).localeCompare(String(b.name)));
   const selected=localStorage.getItem('cardly-txn-card')||'all';
@@ -433,11 +438,11 @@ function renderTransactions(){
   const q=(document.getElementById('txnSearch').value||'').toLowerCase();
   const list=state.transactions.filter(t=>(selected==='all'||t.cardId===selected)&&(!q||t.merchant.toLowerCase().includes(q))).sort(txnNewestFirst);
   if(!list.length){document.getElementById('transactions').innerHTML='<div class="panel empty">No transactions found.</div>';return}
-  let out='',lastMonth=null,rows=[],monthTotal=0,monthReward=0;
-  const flush=()=>{if(lastMonth!==null)out+=`<div class="monthhead${lastMonth==='Today'?' today':''}"><span>${lastMonth}</span><span>${money(monthTotal)}${monthReward>0?` · <span style="color:var(--good)">+${money(monthReward)}</span>`:''}</span></div><div class="list">${rows.join('')}</div>`};
+  let out='',lastMonth=null,lastKey=null,rows=[],monthTotal=0,monthReward=0;
+  const flush=()=>{if(lastMonth!==null){const col=grpCollapsed('tab',lastKey,!!q);out+=grpHead('tab',lastKey,lastMonth,`${money(monthTotal)}${monthReward>0?` · <span style="color:var(--good)">+${money(monthReward)}</span>`:''}`,`${rows.length} transaction${rows.length===1?'':'s'}`,col)+(col?'':`<div class="list">${rows.join('')}</div>`)}};
   list.forEach(t=>{
-    const label=t.date===today()?'Today':monthLabel(t.date);
-    if(label!==lastMonth){flush();lastMonth=label;rows=[];monthTotal=0;monthReward=0}
+    const label=t.date===today()?'Today':monthLabel(t.date),gkey=t.date===today()?'today':t.date.slice(0,7);
+    if(label!==lastMonth){flush();lastMonth=label;lastKey=gkey;rows=[];monthTotal=0;monthReward=0}
     const c=state.cards.find(x=>x.id===t.cardId),reward=rewardFor(t,c);
     if(t.type==='PURCHASE'){monthTotal+=netAmount(t);monthReward+=reward}
     const ref=t.status==='REFUNDED',pay=t.type==='PAYMENT',isRef=t.type==='REFUND',orig=isRef?state.transactions.find(x=>x.id===t.refundOf):null,rAmt=t.type==='PURCHASE'?refundedAmt(t):0,net=netAmount(t),full=t.type==='PURCHASE'&&!ref&&Number(t.amount)>0&&net<=0,part=t.type==='PURCHASE'&&!ref&&rAmt>0&&!full,canRefund=t.type==='PURCHASE'&&!ref&&refundCap(t)>0,struck=ref||full;
@@ -845,8 +850,8 @@ function closeCardDetail(){
 }
 function nestedFromDetail(){if(detailDialog.open)detailDialog.close()}
 function detailTxnRow(t){const isRef=t.type==='REFUND',ref=t.status==='REFUNDED',rAmt=t.type==='PURCHASE'?refundedAmt(t):0,net=netAmount(t),full=t.type==='PURCHASE'&&!ref&&Number(t.amount)>0&&net<=0,part=t.type==='PURCHASE'&&!ref&&rAmt>0&&!full,struck=ref||full,bk=state.cards.find(x=>x.id===t.cardId);return `<div class="row"><span><strong class="${struck?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc(bk?bankName(bk.bankId):'Unknown bank')} · ${esc(bk?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${isRef?'· REFUND':''} ${struck?'· REFUNDED':''} ${part?'· PARTIAL REFUND':''}</span></span><div class="txn-actions">${isRef?`<strong style="color:var(--good);white-space:nowrap">−${money(t.amount)}</strong>`:part?`<span style="text-align:right"><strong>${money(net)}</strong><br><span class="meta"><s>${money(t.amount)}</s></span></span>`:`<strong class="${struck?'txn-refunded':''}">${money(t.amount)}</strong>`}<button class="iconbtn" title="Edit" onclick="nestedFromDetail();${isRef?`openEditRefund('${t.id}')`:`openEditTxn('${t.id}')`}">✎</button></div></div>`}
-function txnGroupsDetail(ts){if(!ts.length)return '<div class="panel"><div class="empty">No transactions for this card.</div></div>';let out='',label=null,rows=[],total=0;const flush=()=>{if(label!==null)out+=`<div class="monthhead${label==='Today'?' today':''}"><span>${label}</span><span>${money(total)}</span></div><div class="panel">${rows.join('')}</div>`};
-  ts.forEach(t=>{const l=t.date===today()?'Today':monthLabel(t.date);if(l!==label){flush();label=l;rows=[];total=0}if(t.type==='PURCHASE')total+=netAmount(t);rows.push(detailTxnRow(t))});flush();return out}
+function txnGroupsDetail(ts,cardId){if(!ts.length)return '<div class="panel"><div class="empty">No transactions for this card.</div></div>';let out='',label=null,key=null,rows=[],total=0;const sc='card:'+cardId;const flush=()=>{if(label!==null){const col=grpCollapsed(sc,key,false);out+=grpHead(sc,key,label,money(total),`${rows.length} transaction${rows.length===1?'':'s'}`,col)+(col?'':`<div class="panel">${rows.join('')}</div>`)}};
+  ts.forEach(t=>{const l=t.date===today()?'Today':monthLabel(t.date);if(l!==label){flush();label=l;key=t.date===today()?'today':t.date.slice(0,7);rows=[];total=0}if(t.type==='PURCHASE')total+=netAmount(t);rows.push(detailTxnRow(t))});flush();return out}
 function openCard(cardId){
   const c=state.cards.find(x=>x.id===cardId); if(!c)return;
   detailDialog.dataset.cardId=cardId;
@@ -874,7 +879,7 @@ function openCard(cardId){
       ${ms.length?ms.map(m=>{const v=spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone panel cardrow"><div class="milestonehead"><strong>${esc(m.name)}</strong><div class="milestone-actions"><span>${Math.round(p)}%</span><button class="btn milestone-edit-btn" onclick="openMilestone('${m.id}')">Edit</button></div></div><div class="meta">${esc(milestonePeriodLabel(m.periodType,m))}</div><div class="bar"><div class="fill" style="width:${p}%"></div></div><div class="meta">${money(v)} / ${money(m.targetAmount)} · ${money(Math.max(0,Number(m.targetAmount)-v))} remaining</div>${note?`<div class="meta" style="margin-top:4px">${note}</div>`:''}</div>`}).join(''):'<div class="panel empty">No milestones configured.</div>'}
     </div>
     <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><button class="btn" onclick="nestedFromDetail();openTxnFor('${c.id}')">+ Add</button></div>
-      ${txnGroupsDetail(ts)}
+      ${txnGroupsDetail(ts,cardId)}
     </div>`;
   showCardDetail();
 }
