@@ -58,7 +58,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .attgroup.collapsible>.sectionhead{cursor:pointer;user-select:none}.attgroup.collapsible>.sectionhead::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s}.attgroup.collapsible.isclosed>.sectionhead::after{transform:rotate(-90deg)}.attgroup.isclosed>.attrows{display:none}.attgroup.isclosed{margin-bottom:12px}
 .filterchip{background:var(--panel);font-weight:600;padding:7px 14px}.filterchip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:12px 0}.chips::-webkit-scrollbar{display:none}.filterchip{flex:none}
-.monthhead{padding:6px 12px;background:var(--soft);border-radius:8px}
+.monthhead{padding:6px 12px;background:var(--soft);border-radius:8px}.list+.monthhead{margin-top:26px}.monthhead.today{background:var(--accent);color:#fff}.monthhead.today span{color:inherit!important}
 .bankhead{padding:6px 12px;background:var(--soft);border-radius:8px}
 
 .inskpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}.inskpi{padding:12px;min-width:0}.inskpi .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.inskpi .v{font-size:clamp(14px,4.4vw,20px);white-space:nowrap;font-weight:800;margin-top:4px;letter-spacing:-.01em}.inskpi .s{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -428,9 +428,9 @@ function renderTransactions(){
   const list=state.transactions.filter(t=>(selected==='all'||t.cardId===selected)&&(!q||t.merchant.toLowerCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date));
   if(!list.length){document.getElementById('transactions').innerHTML='<div class="panel empty">No transactions found.</div>';return}
   let out='',lastMonth=null,rows=[],monthTotal=0,monthReward=0;
-  const flush=()=>{if(lastMonth!==null)out+=`<div class="monthhead"><span>${lastMonth}</span><span>${money(monthTotal)}${monthReward>0?` · <span style="color:var(--good)">+${money(monthReward)}</span>`:''}</span></div><div class="list">${rows.join('')}</div>`};
+  const flush=()=>{if(lastMonth!==null)out+=`<div class="monthhead${lastMonth==='Today'?' today':''}"><span>${lastMonth}</span><span>${money(monthTotal)}${monthReward>0?` · <span style="color:var(--good)">+${money(monthReward)}</span>`:''}</span></div><div class="list">${rows.join('')}</div>`};
   list.forEach(t=>{
-    const label=monthLabel(t.date);
+    const label=t.date===today()?'Today':monthLabel(t.date);
     if(label!==lastMonth){flush();lastMonth=label;rows=[];monthTotal=0;monthReward=0}
     const c=state.cards.find(x=>x.id===t.cardId),reward=rewardFor(t,c);
     if(t.type==='PURCHASE'&&t.status!=='REFUNDED'){monthTotal+=Number(t.amount);monthReward+=reward}
