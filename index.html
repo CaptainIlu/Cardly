@@ -360,8 +360,8 @@ function allMilestones(){
   return out;
 }
 const MS_SORTS={
-  pace:(a,b)=>b.lag-a.lag||a.left-b.left,
-  ending:(a,b)=>a.left-b.left,
+  pace:(a,b)=>(a.achieved-b.achieved)||b.lag-a.lag||a.left-b.left,
+  ending:(a,b)=>(a.achieved-b.achieved)||a.left-b.left,
   achieved:(a,b)=>(b.achieved-a.achieved)||(b.achieved?b.v-a.v:b.lag-a.lag)
 };
 function milestoneSort(){const v=localStorage.getItem('cardly-ms-sort');return MS_SORTS[v]?v:'pace'}
