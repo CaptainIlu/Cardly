@@ -84,6 +84,11 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 
 dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;box-sizing:border-box}
 #feeDetailsGroup,#cardCreateOnly{display:grid;gap:12px}#feeDetailsGroup[hidden],#cardCreateOnly[hidden]{display:none}
+
+.mstools{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin:0 0 16px}.mstools .msbar{margin:0;flex:0 1 auto}.mstools .msfield{flex:0 1 auto}.mstools .msfield:first-child select{width:170px}.mstools .msfield{background:var(--panel)}
+.attgroup.collapsible>.sectionhead::after{font-size:20px;line-height:1;align-self:center;padding:0 4px}
+@media(max-width:560px){.mstools .msbar{width:100%}.mstools .msfield:first-child{flex:1}.mstools .msfield:first-child select{width:auto}}
+.attbtns{display:flex;gap:8px;flex:none}.attmain.clickable{cursor:pointer}.attrow:has(.attmain.clickable):hover{background:var(--soft)}@media(max-width:700px){.attbtns{flex-direction:column;gap:6px}}
 </style>
 </head>
 <body>
@@ -97,7 +102,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
   <main id="dataGate" class="panel data-gate">
     <h1 id="dataGateTitle">Open your Cardly data</h1>
     <p id="dataGateDescription">Choose your Cardly JSON file, or create one. Your cards, bills, payments, milestones, and transactions will be saved directly to that file on this Mac.</p>
-    <div class="data-gate-actions"><button class="btn primary" id="openDataFile">Open Data File</button><button class="btn" id="createDataFile">Create Data File</button><button class="btn" id="driveRestoreGate" hidden>Restore from Google Drive</button><button class="btn" id="resumeDataFile" hidden>Reopen Last Data File</button><button class="btn primary" id="importDataFile" hidden>Import Data File</button></div>
+    <div class="data-gate-actions"><button class="btn primary" id="openDataFile">Open Data File</button><button class="btn" id="createDataFile">Create Data File</button><button class="btn" id="driveRestoreGate" hidden>Restore from Google Drive</button><button class="btn" id="gistRestoreGate" hidden>Restore from GitHub gist</button><button class="btn" id="resumeDataFile" hidden>Reopen Last Data File</button><button class="btn primary" id="importDataFile" hidden>Import Data File</button></div>
     <input id="dataFileInput" type="file" accept="application/json,.json" hidden>
     <p id="dataFileError" class="data-error" role="status"></p>
   </main>
@@ -121,8 +126,8 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
       <div id="homeLayoutBar" class="homebar" hidden></div>
       <div id="homeAttention"></div>
       <div id="homePrimary"><div id="msWrap">
-      <div class="insseg" id="msTypeSeg" style="margin:0 0 12px"><button data-v="all">All</button><button data-v="other">Spend &amp; other</button><button data-v="waiver">Fee waiver</button></div>
-      <div class="msbar"><label class="msfield"><span>Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select></label><label class="msfield"><span>Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></label></div>
+      <div class="mstools"><div class="insseg" id="msTypeSeg" style="margin:0"><button data-v="all">All</button><button data-v="other">Spend &amp; other</button><button data-v="waiver">Fee waiver</button></div>
+      <div class="msbar"><label class="msfield"><span>Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select></label><label class="msfield"><span>Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></label></div></div>
       <div id="msSection"></div></div>
       <div id="billSection"></div></div>
       <div id="utilSection"></div>
@@ -192,6 +197,13 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Google Drive backup</div><div class="muted">Your local data stays the source of truth. Cardly pushes a copy to Drive as a backup.</div></div></div>
       <div class="panel" style="padding:14px"><div class="muted" id="backupStatusText" style="margin-bottom:10px"></div><label id="backupAutoRow" hidden style="display:none;align-items:center;gap:8px;margin-bottom:12px;font-size:14px"><input type="checkbox" id="backupAutoChk"> Back up automatically after changes</label><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="backupConnectBtn">Connect Google Drive</button><button class="btn primary" id="backupNowBtn" hidden>Back up now</button><button class="btn" id="backupRestoreBtn" hidden>Restore from Drive</button><button class="btn" id="backupDisconnectBtn" hidden>Disconnect</button></div></div>
+    </section>
+    <section class="section">
+      <div class="sectionhead"><div><div class="sectiontitle">GitHub gist backup (encrypted)</div><div class="muted">An encrypted copy in a secret gist, so your laptop and iPhone can share the same data. Works alongside Google Drive backup.</div></div></div>
+      <div class="panel" style="padding:14px"><div class="muted" id="gistStatusText" style="margin-bottom:10px"></div>
+      <div id="gistCreds" style="margin-bottom:12px"><div class="field"><label class="label">GitHub token (needs only the “gist” permission)</label><input id="gistTokenIn" type="password" autocomplete="off" placeholder="ghp_…"></div><div class="field" style="margin-top:10px"><label class="label">Backup passphrase (same on every device)</label><input id="gistPassIn" type="password" autocomplete="off"></div></div>
+      <label id="gistAutoRow" style="display:none;align-items:center;gap:8px;margin-bottom:12px;font-size:14px"><input type="checkbox" id="gistAutoChk"> Back up automatically after changes</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="gistConnectBtn">Connect &amp; back up</button><button class="btn" id="gistRestoreOffBtn">Restore from gist</button><button class="btn primary" id="gistNowBtn" hidden>Back up now</button><button class="btn" id="gistRestoreBtn" hidden>Restore from gist</button><button class="btn" id="gistDisconnectBtn" hidden>Disconnect</button></div></div>
     </section>
   </main>
 </div>
@@ -273,7 +285,7 @@ function all(store){return Promise.resolve([...state[store]])}
 function serialisedData(){return {format:'cardly-data',version:1,...state}}
 let _saving=null,_savePending=null;
 function saveDataFile(){if(!_saving){_saving=_saveDataFileNow().finally(()=>{_saving=null});return _saving}if(!_savePending){_savePending=_saving.catch(()=>{}).then(()=>{_savePending=null;return saveDataFile()})}return _savePending}
-async function _saveDataFileNow(){if(dataFileHandle){const writable=await dataFileHandle.createWritable();await writable.write(JSON.stringify(serialisedData()));await writable.close();backupChanged();return}if(mobileStorage){await saveMobileData();backupChanged();return}throw new Error('Open a Cardly data file first.')}
+async function _saveDataFileNow(){if(dataFileHandle){const writable=await dataFileHandle.createWritable();await writable.write(JSON.stringify(serialisedData()));await writable.close();backupChanged();gistChanged();return}if(mobileStorage){await saveMobileData();backupChanged();gistChanged();return}throw new Error('Open a Cardly data file first.')}
 let lastCreatedAt=0;
 async function put(store,obj){if(!stores.includes(store))throw new Error('Unknown data type.');const rows=state[store],index=rows.findIndex(x=>x.id===obj.id);if(index<0){if(store==='transactions'&&!obj.createdAt){lastCreatedAt=Math.max(Date.now(),lastCreatedAt+1);obj.createdAt=lastCreatedAt}rows.push(obj)}else rows[index]=obj;cacheVer++;await saveDataFile();return obj}
 async function del(store,id){if(!stores.includes(store))throw new Error('Unknown data type.');state[store]=state[store].filter(x=>x.id!==id);cacheVer++;await saveDataFile()}
@@ -347,7 +359,7 @@ function setTab(t){
 }
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{setTab(b.dataset.tab);window.scrollTo(0,0)});
 function dueLabel(d){return d<0?`Overdue by ${-d} day${-d===1?'':'s'}`:d===0?'Due today':`Due in ${d} day${d===1?'':'s'}`}
-function attRow(inner,btn,cls=''){return `<div class="attrow${cls?' '+cls:''}"><div class="attmain">${inner}</div>${btn}</div>`}
+function attRow(inner,btn,cls='',openId=''){return `<div class="attrow${cls?' '+cls:''}"><div class="attmain${openId?' clickable':''}"${openId?` onclick="openCard('${openId}')"`:''}>${inner}</div>${btn}</div>`}
 function attSection(title,sub,rows){return `<div class="attgroup"><div class="sectionhead"><div><div class="sectiontitle">${title} <span class="muted">· ${rows.length}</span></div><div class="muted">${sub}</div></div></div><div class="panel attrows">${rows.join('')}</div></div>`}
 function allMilestones(){
   const out=[];
@@ -385,7 +397,7 @@ function renderHome(){
   const fees=active.filter(feeDueSoon).map(c=>({c,rd:nextRenewalDate(c)})).sort((a,b)=>a.rd.localeCompare(b.rd));
   const ais=aisSummary().filter(g=>g.level==='crossed');
   let out='';
-  if(unpaid.length)out+=attSection('Unpaid bills','Overdue first, then by due date.',unpaid.map(({c,d})=>{const late=d!==null&&d<0,soon=d!==null&&d<=DUE_REMINDER_DAYS;return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta"${late?' style="color:var(--bad)"':''}>${d===null?'Due date unknown':`${dueLabel(d)} · ${esc(displayDate(dueDate(c)))}`} · Outstanding ${money(outstanding(c))}</div>`,`<button class="btn${soon?' primary':''}" onclick="openPayment('${c.id}')">+ Add Payment</button>`)}));
+  if(unpaid.length)out+=attSection('Unpaid bills','Overdue first, then by due date.',unpaid.map(({c,d})=>{const late=d!==null&&d<0,soon=d!==null&&d<=DUE_REMINDER_DAYS;return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta"${late?' style="color:var(--bad)"':''}>${d===null?'Due date unknown':`${dueLabel(d)} · ${esc(displayDate(dueDate(c)))}`} · Outstanding ${money(outstanding(c))}</div>`,`<div class="attbtns"><button class="btn" onclick="openPayment('${c.id}')">+ Add Payment</button><button class="btn${soon?' primary':''}" onclick="openPayment('${c.id}',true)">Mark Bill Paid</button></div>`,'',c.id)}));
   if(msUrgent.length)out+=attSection('Milestones ending soon',`Incomplete, with ${milestoneSoonDays()} day${milestoneSoonDays()===1?'':'s'} or less left.`,msUrgent.map(({m,c,v,target,left,end})=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)} — ${esc(m.name)}</span></div><div class="meta">${money(v)} of ${money(target)} · ${money(target-v)} to go · ${left===0?'ends today':`${left} day${left===1?'':'s'} left`} (${esc(displayDate(end))})</div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)));
   if(billUpdates.length)out+=attSection('Bill details needed',`Add the latest bill issued on or before ${esc(displayDate(today()))}.`,billUpdates.map(c=>{const sd=latestStatementDate(c);return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Statement date ${esc(displayDate(sd))} · not updated after two days</div>`,`<button class="btn primary" onclick="openBill('${c.id}','${sd}')">Add Bill Details</button>`)}));
   const lookahead=renewalListDays(),upcoming=state.cards.filter(c=>c.active!==false&&!c.lifetimeFree&&c.renewalDate).map(c=>({c,rd:nextRenewalDate(c)})).map(x=>({...x,d:daysUntil(x.rd)})).filter(x=>x.d!==null&&x.d>=0&&x.d<=lookahead).sort((a,b)=>a.d-b.d);
@@ -530,7 +542,8 @@ function backupOn(){return !!bMeta().connected}
 function backupAutoOn(){return backupOn()&&bMeta().auto!==false}
 function driveToken(){try{const t=JSON.parse(dLS.get('cardly-drive-token')||'null');return t&&t.exp>Date.now()+30000?t.t:null}catch(e){return null}}
 function fmtT(v){return new Date(v).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}
-function backupSuffix(){if(!backupOn())return '';const m=bMeta();if(backupBusy)return ' · ☁ backing up…';if(m.dirty)return ' · ☁ backup pending';return m.last?` · ☁ backed up ${fmtT(m.last)}`:''}
+function backupSuffix(){return driveSuffix()+gistSuffix()}
+function driveSuffix(){if(!backupOn())return '';const m=bMeta();if(backupBusy)return ' · ☁ backing up…';if(m.dirty)return ' · ☁ backup pending';return m.last?` · ☁ backed up ${fmtT(m.last)}`:''}
 function backupStatusLine(){const m=bMeta();if(!m.connected)return 'Not connected. Connecting uses your Google account and only touches the one file Cardly creates in your Drive.';if(backupBusy)return 'Backing up to Google Drive…';if(backupErr)return '⚠ '+backupErr;
   return (m.last?`Last backup: ${fmtT(m.last)}.`:'No backup yet.')+(m.dirty?' Changes since then are waiting to be backed up'+(driveToken()?'.':' — tap Back up now (it will ask you to sign in).'):' Everything is backed up.')}
 function renderDriveSettings(){const c=document.getElementById('backupConnectBtn');if(!c)return;const on=backupOn();c.hidden=on;['backupNowBtn','backupRestoreBtn','backupDisconnectBtn'].forEach(id=>document.getElementById(id).hidden=!on);const row=document.getElementById('backupAutoRow');row.hidden=!on;row.style.display=on?'flex':'none';document.getElementById('backupAutoChk').checked=backupAutoOn();document.getElementById('backupStatusText').textContent=backupStatusLine()}
@@ -591,6 +604,69 @@ async function migrateDriveMode(){if(dLS.get('cardly-storage')!=='drive')return;
 setInterval(()=>{if(backupAutoOn()&&bMeta().dirty&&!document.hidden&&driveToken()&&!backupBusy)backupNow(false)},300000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&backupAutoOn()&&bMeta().dirty&&driveToken())backupNow(false)});
 window.addEventListener('online',()=>{if(backupAutoOn()&&bMeta().dirty&&driveToken())backupNow(false)});
+/* ===== Encrypted GitHub Gist backup (local data stays the source of truth) ===== */
+const GIST_FILE='cardly-data.enc.json',GIST_API='https://api.github.com';
+let gistBusy=false,gistTimer=null,gistErr='',_gk=null;
+function gMeta(){try{return JSON.parse(dLS.get('cardly-gist-meta')||'{}')}catch(e){return{}}}
+function setGMeta(o){dLS.set('cardly-gist-meta',JSON.stringify({...gMeta(),...o}))}
+function gistOn(){return !!gMeta().connected}
+function gistAutoOn(){return gistOn()&&gMeta().auto!==false}
+const b64e=u=>{let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)};
+const b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function gzipBytes(u8,mode){const S=mode==='gz'?CompressionStream:DecompressionStream;const st=new Blob([u8]).stream().pipeThrough(new S('gzip'));return new Uint8Array(await new Response(st).arrayBuffer())}
+async function gistKey(pass,salt){const id=pass+'|'+b64e(salt);if(_gk&&_gk.id===id)return _gk.k;const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);const k=await crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);_gk={id,k};return k}
+async function gistEncrypt(obj,pass){let salt;const sm=gMeta().salt;salt=sm?b64d(sm):crypto.getRandomValues(new Uint8Array(16));const iv=crypto.getRandomValues(new Uint8Array(12));
+  let raw=new TextEncoder().encode(JSON.stringify(obj)),gz=false;if(window.CompressionStream){raw=await gzipBytes(raw,'gz');gz=true}
+  const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await gistKey(pass,salt),raw));
+  return JSON.stringify({app:'cardly',v:1,kdf:'PBKDF2-SHA256',iter:250000,alg:'AES-GCM',gz,salt:b64e(salt),iv:b64e(iv),data:b64e(ct)})}
+async function gistDecrypt(text,pass){let j;try{j=JSON.parse(text)}catch(e){throw new Error('The gist file is not a Cardly backup.')}
+  if(j.app!=='cardly'||!j.data)throw new Error('The gist file is not a Cardly backup.');const salt=b64d(j.salt);
+  let raw;try{raw=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(j.iv)},await gistKey(pass,salt),b64d(j.data)))}catch(e){throw new Error('Wrong passphrase (or the backup is damaged).')}
+  if(j.gz)raw=await gzipBytes(raw,'un');return {data:JSON.parse(new TextDecoder().decode(raw)),salt:j.salt}}
+async function gistFetch(path,opts={}){const t=dLS.get('cardly-gist-token');if(!t)throw new Error('Add your GitHub token first.');
+  const r=await fetch(path.startsWith('http')?path:GIST_API+path,{...opts,headers:{Authorization:'Bearer '+t,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(opts.headers||{})}});
+  if(r.status===401)throw new Error('GitHub rejected the token (expired or wrong). Create a new one and reconnect.');
+  if(r.status===403||r.status===404&&!opts.allow404){let m='';try{m=(await r.clone().json()).message}catch(e){}throw Object.assign(new Error(r.status===404?'Gist not found.':'GitHub refused: '+(m||'check the token has the gist permission.')),{status:r.status})}
+  if(r.status===404)throw Object.assign(new Error('Gist not found.'),{status:404});
+  if(!r.ok){let m='';try{m=(await r.json()).message}catch(e){}throw new Error('GitHub error '+r.status+(m?': '+m:''))}return r}
+async function gistFind(){for(let p=1;p<=5;p++){const l=await (await gistFetch(`/gists?per_page=100&page=${p}`)).json();const g=l.find(x=>x.files&&x.files[GIST_FILE]);if(g)return g;if(l.length<100)break}return null}
+async function gistHead(id){const l=await (await gistFetch(`/gists/${id}/commits?per_page=1`)).json();return l[0]?{ver:l[0].version,at:l[0].committed_at}:null}
+async function gistRead(id){const g=await (await gistFetch('/gists/'+id)).json();const f=g.files&&g.files[GIST_FILE];if(!f)throw new Error('The gist has no Cardly file.');let c=f.content;if(f.truncated||c==null)c=await (await fetch(f.raw_url)).text();return {text:c,ver:(g.history&&g.history[0]&&g.history[0].version)||null,at:g.updated_at}}
+async function gistWrite(id,text){const body=JSON.stringify({files:{[GIST_FILE]:{content:text}}});
+  if(id){const g=await (await gistFetch('/gists/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body})).json();return {id:g.id,ver:g.history[0].version,at:g.updated_at}}
+  const g=await (await gistFetch('/gists',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:'Cardly encrypted backup',public:false,files:{[GIST_FILE]:{content:text}}})})).json();return {id:g.id,ver:g.history[0].version,at:g.updated_at}}
+function gistCreds(){const t=(document.getElementById('gistTokenIn')||{}).value||dLS.get('cardly-gist-token')||prompt('GitHub token (with the "gist" permission):')||'';const p=(document.getElementById('gistPassIn')||{}).value||dLS.get('cardly-gist-pass')||prompt('Backup passphrase:')||'';if(!t||!p)throw new Error('Token and passphrase are both needed.');dLS.set('cardly-gist-token',t.trim());dLS.set('cardly-gist-pass',p);return p}
+function gistStatusLine(){const m=gMeta();if(!m.connected)return 'Not connected. Stores an encrypted copy in a secret GitHub gist, so every device you connect can restore the same data. Needs a GitHub token with only the “gist” permission, plus a passphrase of your choice (don’t lose it — it can’t be recovered).';if(gistBusy)return 'Backing up to GitHub…';if(gistErr)return '⚠ '+gistErr;return (m.last?`Last backup: ${fmtT(m.last)}.`:'No backup yet.')+(m.dirty?' Changes since then are waiting to be backed up.':' Everything is backed up.')}
+function gistSuffix(){if(!gistOn())return '';const m=gMeta();if(gistBusy)return ' · ⌥ gist backing up…';if(gistErr)return ' · ⌥ gist ⚠';if(m.dirty)return ' · ⌥ gist pending';return m.last?` · ⌥ gist ${fmtT(m.last)}`:''}
+function renderGistSettings(){const c=document.getElementById('gistConnectBtn');if(!c)return;const on=gistOn();c.hidden=on;document.getElementById('gistCreds').style.display=on?'none':'block';['gistNowBtn','gistRestoreBtn','gistDisconnectBtn'].forEach(id=>document.getElementById(id).hidden=!on);const row=document.getElementById('gistAutoRow');row.style.display=on?'flex':'none';document.getElementById('gistAutoChk').checked=gistAutoOn();document.getElementById('gistRestoreOffBtn').hidden=on;document.getElementById('gistStatusText').textContent=gistStatusLine();try{updateSyncStatus()}catch(e){}}
+function gistChanged(){if(!gistOn())return;setGMeta({dirty:true,changedAt:Date.now()});renderGistSettings();gistSchedule()}
+function gistSchedule(){clearTimeout(gistTimer);if(!gistAutoOn())return;gistTimer=setTimeout(()=>gistNow(false),20000)}
+async function gistNow(manual){if(gistBusy||!gistOn())return;gistErr='';gistBusy=true;renderGistSettings();const started=Date.now();
+  try{const pass=dLS.get('cardly-gist-pass');if(!pass)throw new Error('Passphrase missing on this device — reconnect.');const m=gMeta();
+    if(m.gistId&&m.ver){const h=await gistHead(m.gistId);if(h&&h.ver!==m.ver){if(!manual){throw new Error('Another device updated the gist. Use Restore to take it, or Back up now to overwrite it.')}
+      if(!confirm(`The gist was changed from another device (${fmtT(h.at)}).\n\nOK = overwrite it with the data on this device\nCancel = keep it (use Restore to take it instead)`)){gistBusy=false;renderGistSettings();return}}}
+    const text=await gistEncrypt(serialisedData(),pass);const w=await gistWrite(m.gistId,text);
+    setGMeta({gistId:w.id,ver:w.ver,last:Date.now(),dirty:(gMeta().changedAt||0)>started,salt:JSON.parse(text).salt});if(manual)toast('✓ Backed up to GitHub gist')
+  }catch(e){gistErr=e.message;if(manual)toast(e.message)}
+  finally{gistBusy=false;renderGistSettings();if(gMeta().dirty&&!gistErr)gistSchedule()}}
+async function connectGist(){try{const pass=gistCreds();gistBusy=true;gistErr='';renderGistSettings();
+    const ex=await gistFind();if(ex&&!confirm('A Cardly backup already exists in your GitHub gists (last changed '+fmtT(ex.updated_at)+').\n\nOK = overwrite it with the data on this device and use it\nCancel = don’t connect (use “Restore from gist” to load it instead)'))return;
+    if(ex){try{const old=await gistRead(ex.id);const j=JSON.parse(old.text);if(j.salt)setGMeta({salt:j.salt})}catch(e){}}
+    const text=await gistEncrypt(serialisedData(),pass);const w=await gistWrite(ex?ex.id:null,text);
+    setGMeta({connected:true,gistId:w.id,ver:w.ver,last:Date.now(),dirty:false,auto:true,salt:JSON.parse(text).salt});toast('✓ GitHub gist backup connected')
+  }catch(e){gistErr='';toast(e.message)}finally{gistBusy=false;renderGistSettings()}}
+async function restoreFromGist(fromGate){try{const pass=gistCreds();gistBusy=true;renderGistSettings();
+    const g=await gistFind();if(!g){throw new Error('No Cardly backup found in this GitHub account’s gists.')}
+    if(!fromGate&&!confirm(`Replace ALL data on this device with the gist copy from ${fmtT(g.updated_at)}?\n\nWhat is currently on this device will be overwritten.`))return;
+    const r=await gistRead(g.id),d=await gistDecrypt(r.text,pass);applyData(d.data);
+    if(fromGate){mobileStorage=true;dataFileHandle=null}
+    await saveDataFile();await load();setGMeta({connected:true,gistId:g.id,ver:r.ver,last:Date.now(),dirty:false,auto:true,salt:d.salt});
+    if(fromGate){try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}showDashboard()}
+    toast('✓ Restored from GitHub gist')
+  }catch(e){toast(e.message);if(fromGate)setFileError(e.message)}finally{gistBusy=false;renderGistSettings()}}
+function disconnectGist(){if(!confirm('Disconnect the GitHub gist backup on this device? Your data and the gist itself are not touched. The saved token and passphrase are removed from this device.'))return;['cardly-gist-meta','cardly-gist-token','cardly-gist-pass'].forEach(k=>dLS.del(k));clearTimeout(gistTimer);gistErr='';renderGistSettings()}
+document.getElementById('gistConnectBtn').onclick=connectGist;document.getElementById('gistNowBtn').onclick=()=>gistNow(true);document.getElementById('gistRestoreBtn').onclick=()=>restoreFromGist(false);document.getElementById('gistRestoreOffBtn').onclick=()=>restoreFromGist(false);document.getElementById('gistDisconnectBtn').onclick=disconnectGist;document.getElementById('gistRestoreGate').onclick=()=>restoreFromGist(true);document.getElementById('gistAutoChk').onchange=e=>{setGMeta({auto:e.target.checked});if(e.target.checked&&gMeta().dirty)gistSchedule();renderGistSettings()};
+renderGistSettings();
 document.getElementById('backupConnectBtn').onclick=connectBackup;document.getElementById('backupNowBtn').onclick=()=>backupNow(true);document.getElementById('backupRestoreBtn').onclick=()=>restoreFromDrive(false);document.getElementById('backupDisconnectBtn').onclick=disconnectBackup;document.getElementById('driveRestoreGate').onclick=()=>restoreFromDrive(true);
 document.getElementById('backupAutoChk').onchange=e=>{setBMeta({auto:e.target.checked});if(e.target.checked&&bMeta().dirty)backupSchedule();backupRefreshUI()};
 const NOTIFY_KEY='cardly-notify-enabled', NOTIFY_SEEN_KEY='cardly-notify-seen';
@@ -876,9 +952,9 @@ function closeCardDetail(){
   if(cardPageOpen()){cardPage.hidden=true;document.getElementById('dashboard').hidden=false;placeDetailContent(false);render();window.scrollTo(0,cardPageScrollY)}
 }
 function nestedFromDetail(){if(detailDialog.open)detailDialog.close()}
-function detailTxnRow(t){const isRef=t.type==='REFUND',ref=t.status==='REFUNDED',rAmt=t.type==='PURCHASE'?refundedAmt(t):0,net=netAmount(t),full=t.type==='PURCHASE'&&!ref&&Number(t.amount)>0&&net<=0,part=t.type==='PURCHASE'&&!ref&&rAmt>0&&!full,struck=ref||full,bk=cardById(t.cardId);return `<div class="row"><span><strong class="${struck?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc(bk?bankName(bk.bankId):'Unknown bank')} · ${esc(bk?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${isRef?'· REFUND':''} ${struck?'· REFUNDED':''} ${part?'· PARTIAL REFUND':''}</span></span><div class="txn-actions">${isRef?`<strong style="color:var(--good);white-space:nowrap">−${money(t.amount)}</strong>`:part?`<span style="text-align:right"><strong>${money(net)}</strong><br><span class="meta"><s>${money(t.amount)}</s></span></span>`:`<strong class="${struck?'txn-refunded':''}">${money(t.amount)}</strong>`}<button class="iconbtn" title="Edit" onclick="nestedFromDetail();${isRef?`openEditRefund('${t.id}')`:`openEditTxn('${t.id}')`}">✎</button></div></div>`}
-function txnGroupsDetail(ts,cardId){if(!ts.length)return '<div class="panel"><div class="empty">No transactions for this card.</div></div>';let out='',label=null,key=null,rows=[],total=0;const sc='card:'+cardId;const flush=()=>{if(label!==null){const col=grpCollapsed(sc,key,false);out+=grpHead(sc,key,label,money(total),`${rows.length} transaction${rows.length===1?'':'s'}`,col)+(col?'':`<div class="panel">${rows.map(f=>f()).join('')}</div>`)}};
-  ts.forEach(t=>{const l=t.date===today()?'Today':monthLabel(t.date);if(l!==label){flush();label=l;key=t.date===today()?'today':t.date.slice(0,7);rows=[];total=0}if(t.type==='PURCHASE')total+=netAmount(t);rows.push(()=>detailTxnRow(t))});flush();return out}
+function detailTxnRow(t){const isRef=t.type==='REFUND',ref=t.status==='REFUNDED',rAmt=t.type==='PURCHASE'?refundedAmt(t):0,net=netAmount(t),full=t.type==='PURCHASE'&&!ref&&Number(t.amount)>0&&net<=0,part=t.type==='PURCHASE'&&!ref&&rAmt>0&&!full,struck=ref||full,bk=cardById(t.cardId),rw=t.type==='PURCHASE'&&!ref?rewardFor(t,bk):0,rwn=rw>0?`<div class="meta" style="color:var(--good)">+${money(rw)}</div>`:'';return `<div class="row"><span><strong class="${struck?'txn-refunded':''}">${esc(t.merchant)}</strong><br><span class="meta">${esc(displayDate(t.date))} · ${esc(bk?bankName(bk.bankId):'Unknown bank')} · ${esc(bk?.name||'Unknown card')} ${t.type==='PAYMENT'?'· PAYMENT':''} ${isRef?'· REFUND':''} ${struck?'· REFUNDED':''} ${part?'· PARTIAL REFUND':''}</span></span><div class="txn-actions"><span style="text-align:right">${isRef?`<strong style="color:var(--good);white-space:nowrap">−${money(t.amount)}</strong>`:part?`<span style="text-align:right"><strong>${money(net)}</strong><br><span class="meta"><s>${money(t.amount)}</s></span></span>`:`<strong class="${struck?'txn-refunded':''}">${money(t.amount)}</strong>`}${rwn}</span><button class="iconbtn" title="Edit" onclick="nestedFromDetail();${isRef?`openEditRefund('${t.id}')`:`openEditTxn('${t.id}')`}">✎</button></div></div>`}
+function txnGroupsDetail(ts,cardId){if(!ts.length)return '<div class="panel"><div class="empty">No transactions for this card.</div></div>';let out='',label=null,key=null,rows=[],total=0,rwd=0;const sc='card:'+cardId;const flush=()=>{if(label!==null){const col=grpCollapsed(sc,key,false);out+=grpHead(sc,key,label,money(total)+(rwd>0?` · <span style="color:var(--good)">+${money(rwd)}</span>`:''),`${rows.length} transaction${rows.length===1?'':'s'}`,col)+(col?'':`<div class="panel">${rows.map(f=>f()).join('')}</div>`)}};
+  ts.forEach(t=>{const l=t.date===today()?'Today':monthLabel(t.date);if(l!==label){flush();label=l;key=t.date===today()?'today':t.date.slice(0,7);rows=[];total=0;rwd=0}if(t.type==='PURCHASE'){total+=netAmount(t);rwd+=rewardFor(t,cardById(t.cardId))}rows.push(()=>detailTxnRow(t))});flush();return out}
 function openCard(cardId){
   const c=state.cards.find(x=>x.id===cardId); if(!c)return;
   detailDialog.dataset.cardId=cardId;
@@ -1038,7 +1114,7 @@ async function refreshFromNativeFile(){if(!nativeFileApi||!dataFileHandle||!data
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshFromNativeFile()});
 const supportsDirectFileAccess='showOpenFilePicker'in window&&'showSaveFilePicker'in window;
 document.getElementById('openDataFile').onclick=()=>chooseDataFile(false);document.getElementById('createDataFile').onclick=()=>chooseDataFile(true);document.getElementById('resumeDataFile').onclick=reopenLastDataFile;document.getElementById('importDataFile').onclick=()=>document.getElementById('dataFileInput').click();document.getElementById('dataFileInput').onchange=e=>{const file=e.target.files[0];if(file)importDataFile(file);e.target.value=''};document.getElementById('exportDataFile').onclick=exportMobileData;document.getElementById('reloadDataFile').onclick=()=>{if(mobileDirty()&&!confirm('This phone has changes that were not saved to the file. Loading the file will replace them. Continue?'))return;document.getElementById('dataFileInput').click()};
-migrateDriveMode().finally(()=>{if(nativeFileApi){document.getElementById('dataGateDescription').textContent='Choose cardly-data.json in iCloud Drive. Cardly will read it, and save your changes straight back to that file.';document.getElementById('createDataFile').hidden=true;nativeFileApi.hasFile().then(async res=>{if(res&&res.has)await useDataFile(makeNativeHandle())}).catch(()=>{})}else if(supportsDirectFileAccess){getRememberedFileHandle().then(async handle=>{if(!handle)return;const permission=await handle.queryPermission({mode:'readwrite'});if(permission==='granted')await useDataFile(handle);else document.getElementById('resumeDataFile').hidden=false}).catch(()=>{})}else{document.getElementById('dataGateTitle').textContent='Import your Cardly data';document.getElementById('dataGateDescription').textContent='Choose cardly-data.json from the Files app. Cardly will keep your changes on this iPhone until you export an updated file back to iCloud Drive.';document.getElementById('openDataFile').hidden=true;document.getElementById('createDataFile').hidden=true;document.getElementById('importDataFile').hidden=false;document.getElementById('driveRestoreGate').hidden=false;getMobileData().then(async data=>{if(!data)return;mobileStorage=true;applyData(data);await load();showDashboard()}).catch(()=>setFileError('Could not open this browser’s saved Cardly data.'))}});
+migrateDriveMode().finally(()=>{if(nativeFileApi){document.getElementById('dataGateDescription').textContent='Choose cardly-data.json in iCloud Drive. Cardly will read it, and save your changes straight back to that file.';document.getElementById('createDataFile').hidden=true;nativeFileApi.hasFile().then(async res=>{if(res&&res.has)await useDataFile(makeNativeHandle())}).catch(()=>{})}else if(supportsDirectFileAccess){getRememberedFileHandle().then(async handle=>{if(!handle)return;const permission=await handle.queryPermission({mode:'readwrite'});if(permission==='granted')await useDataFile(handle);else document.getElementById('resumeDataFile').hidden=false}).catch(()=>{})}else{document.getElementById('dataGateTitle').textContent='Import your Cardly data';document.getElementById('dataGateDescription').textContent='Choose cardly-data.json from the Files app. Cardly will keep your changes on this iPhone until you export an updated file back to iCloud Drive.';document.getElementById('openDataFile').hidden=true;document.getElementById('createDataFile').hidden=true;document.getElementById('importDataFile').hidden=false;document.getElementById('driveRestoreGate').hidden=false;document.getElementById('gistRestoreGate').hidden=false;getMobileData().then(async data=>{if(!data)return;mobileStorage=true;applyData(data);await load();showDashboard()}).catch(()=>setFileError('Could not open this browser’s saved Cardly data.'))}});
 
 (function(){
   const indicator=document.getElementById('pullRefresh');
