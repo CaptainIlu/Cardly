@@ -143,7 +143,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 
     <div class="tabpane" id="tab-transactions" hidden>
       <div class="sectionhead"><div><div class="sectiontitle">Transactions</div><div class="muted" id="txnFySummary"></div></div><button class="btn primary addbtn" id="addTxn" title="Add transaction" aria-label="Add transaction">+</button></div>
-      <div class="toolbar"><input class="search" id="txnSearch" placeholder="Search merchant..."></div>
+      <div class="toolbar"><input class="search" id="txnSearch" placeholder="Search merchant, card or bank..."></div>
       <div class="chips" id="txnCardChips"></div>
       <div id="transactions"></div>
     </div>
@@ -484,7 +484,8 @@ function renderTransactions(){
   const fySpend=fyTxns.reduce((a,t)=>a+netAmount(t),0),fyRewards=fyTxns.reduce((a,t)=>a+rewardFor(t,cardById(t.cardId)),0);
   document.getElementById('txnFySummary').textContent=`${fy.label}: ${money(fySpend)} spent${fyRewards>0?` · ${money(fyRewards)} rewards`:''}`;
   const q=(document.getElementById('txnSearch').value||'').toLowerCase();
-  const list=state.transactions.filter(t=>(selected==='all'||t.cardId===selected)&&(!q||t.merchant.toLowerCase().includes(q))).sort(txnNewestFirst);
+  const qTokens=q.split(/\s+/).filter(Boolean),hayC=new Map(),txnHay=t=>{let h=hayC.get(t.cardId);if(h===undefined){const c=cardById(t.cardId);h=c?(bankName(c.bankId)+' '+c.name+' '+(c.last4||'')+' '+(c.network||'')).toLowerCase():'';hayC.set(t.cardId,h)}return (t.merchant||'').toLowerCase()+' '+h};
+  const list=state.transactions.filter(t=>(selected==='all'||t.cardId===selected)&&(!q||qTokens.every(w=>txnHay(t).includes(w)))).sort(txnNewestFirst);
   if(!list.length){document.getElementById('transactions').innerHTML='<div class="panel empty">No transactions found.</div>';return}
   let out='',lastMonth=null,lastKey=null,rows=[],monthTotal=0,monthReward=0;
   const flush=()=>{if(lastMonth!==null){const col=grpCollapsed('tab',lastKey,!!q);out+=grpHead('tab',lastKey,lastMonth,`${money(monthTotal)}${monthReward>0?` · <span style="color:var(--good)">+${money(monthReward)}</span>`:''}`,`${rows.length} transaction${rows.length===1?'':'s'}`,col)+(col?'':`<div class="list">${rows.map(f=>f()).join('')}</div>`)}};
@@ -512,6 +513,35 @@ function renderAis(){
   document.getElementById('aisTracker').innerHTML=head+(used.length?`<div class="list">${rows}</div>`:'<div class="panel empty">No bill payments logged this financial year yet.</div>')+(idle.length?`<div class="muted" style="margin-top:14px">No payments yet this FY: ${idle.map(g=>esc(g.bankName)).join(', ')}</div>`:'');
 }
 
+
+/* ---- Merchant analytics (inside Insights; follows the selected range + Spend/Rewards metric) ---- */
+let insMerch=null,insMerchQ='',insMerchAll=false,_mc=null;
+const merchKey=n=>String(n||'').trim().toLowerCase().replace(/\s+/g,' ');
+function setInsMerch(i){insMerch=(_mc&&_mc.all[i])?_mc.all[i].key:null;renderMerchPanel()}
+function insMerchSearch(v){insMerchQ=v;renderMerchPanel(true)}
+function insMerchToggle(){insMerchAll=!insMerchAll;renderMerchPanel()}
+function insMerchOpenTxns(i){const g=_mc&&_mc.all[i];if(!g)return;try{localStorage.setItem('cardly-txn-card','all')}catch(e){}const el=document.getElementById('txnSearch');el.value=g.name;setTab('transactions');renderTransactions();window.scrollTo(0,0)}
+function buildMerchants(tx,val){const m=new Map();tx.forEach(t=>{const k=merchKey(t.merchant)||'(no name)';let g=m.get(k);if(!g){g={key:k,names:new Map(),total:0,n:0,max:0,first:t.date,last:t.date,cards:new Map(),txs:[]};m.set(k,g)}const v=val(t);g.names.set(t.merchant,(g.names.get(t.merchant)||0)+1);g.total+=v;g.n++;g.max=Math.max(g.max,v);if(t.date<g.first)g.first=t.date;if(t.date>g.last)g.last=t.date;g.cards.set(t.cardId,(g.cards.get(t.cardId)||0)+v);g.txs.push(t)});
+  return [...m.values()].map(g=>{g.name=[...g.names.entries()].sort((a,b)=>b[1]-a[1])[0][0].trim()||'(no name)';return g}).sort((a,b)=>b.total-a.total).map((g,i)=>(g.i=i,g))}
+function renderMerchPanel(keepFocus){const el=document.getElementById('insMerch');if(!el||!_mc)return;const{all,total,isR,months,lab,mn,val}=_mc;
+  const sel=insMerch?all.find(g=>g.key===insMerch):null;
+  if(sel){const byM={};months.forEach(k=>byM[k]=0);sel.txs.forEach(t=>{const k=String(t.date).slice(0,7);if(byM[k]!==undefined)byM[k]+=val(t)});const mx=Math.max(1,...months.map(k=>byM[k]));
+    const bars=months.map(k=>`<div class="insbar${byM[k]?'':' zero'}" title="${lab(k)}: ${money(byM[k])}"><i style="height:${byM[k]?Math.max(2,byM[k]/mx*100):2}%"></i></div>`).join(''),xl=months.map((k,i)=>`<span>${months.length>8&&i%2?'':mn[Number(k.slice(5))-1]}</span>`).join('');
+    const cards=[...sel.cards.entries()].sort((a,b)=>b[1]-a[1]).map(([cid,v])=>{const c=cardById(cid);return `<div class="insrow"><div class="nm bnrow">${c?bankTag(c.bankId):''}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c?c.name:'Deleted card')}</span></div><div class="amt">${money(v)}<span>${Math.round(v/sel.total*100)}%</span></div><div class="tr"><i style="width:${v/sel.total*100}%"></i></div></div>`}).join('');
+    const recent=[...sel.txs].sort(txnNewestFirst).slice(0,6).map(t=>{const c=cardById(t.cardId);return `<div class="insrow" style="grid-template-columns:minmax(0,1fr) auto"><div class="nm muted">${esc(displayDate(t.date))} · ${esc(c?c.name:'Deleted card')}</div><div class="amt">${money(val(t))}</div></div>`}).join('');
+    el.innerHTML=`<div class="panel inspanel"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><button class="btn" onclick="setInsMerch(-1)">← Merchants</button><h3 style="margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(sel.name)}</h3></div>
+      <div class="inskpis" style="margin-top:10px"><div class="panel inskpi"><div class="k">${isR?'Rewards':'Spent'}</div><div class="v">${money(sel.total)}</div><div class="s">${Math.round(sel.total/total*100)}% of all</div></div><div class="panel inskpi"><div class="k">Purchases</div><div class="v">${sel.n}</div><div class="s">avg ${money(sel.total/sel.n)}</div></div><div class="panel inskpi"><div class="k">Largest</div><div class="v">${money(sel.max)}</div><div class="s">last ${esc(displayDate(sel.last).slice(0,5))}</div></div></div>
+      <h3>By month</h3><div class="insbars" style="margin-top:8px">${bars}</div><div class="insx">${xl}</div>
+      <h3 style="margin-top:16px">Cards used</h3>${cards}<h3 style="margin-top:16px">Recent</h3>${recent}
+      <div style="margin-top:12px"><button class="btn" onclick="insMerchOpenTxns(${sel.i})">See all in Transactions</button></div></div>`;return}
+  const q=merchKey(insMerchQ),list=q?all.filter(g=>g.key.includes(q)):all,top=all[0],shown=insMerchAll||q?list:list.slice(0,10);
+  const top5=all.slice(0,5).reduce((a,g)=>a+g.total,0),rep=all.filter(g=>g.n>1).length;
+  const rows=shown.map(g=>`<div class="insrow clickable" onclick="setInsMerch(${g.i})"><div class="nm" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)} <span class="muted">· ${g.n}×</span></div><div class="amt">${money(g.total)}<span>${Math.round(g.total/total*100)}%</span></div><div class="tr"><i style="width:${g.total/top.total*100}%"></i></div></div>`).join('')||'<div class="muted" style="padding:10px 0">No merchants match.</div>';
+  el.innerHTML=`<div class="panel inspanel"><h3>${isR?'Top merchants by rewards':'Top merchants'}</h3>
+    <div class="inskpis" style="margin:10px 0"><div class="panel inskpi"><div class="k">Merchants</div><div class="v">${all.length}</div><div class="s">${rep} repeat</div></div><div class="panel inskpi"><div class="k">Top 5 share</div><div class="v">${Math.round(top5/total*100)}%</div><div class="s">${money(top5)}</div></div><div class="panel inskpi"><div class="k">#1</div><div class="v" style="font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(top.name)}</div><div class="s">${money(top.total)}</div></div></div>
+    <input id="insMerchQ" type="search" placeholder="Search merchants" value="${esc(insMerchQ)}" oninput="insMerchSearch(this.value)" style="width:100%;margin:0 0 6px" autocomplete="off">${rows}
+    ${!q&&list.length>10?`<div style="margin-top:8px"><button class="btn" onclick="insMerchToggle()">${insMerchAll?'Show top 10':'Show all '+list.length}</button></div>`:''}</div>`;
+  if(keepFocus){const i=document.getElementById('insMerchQ');if(i){i.focus();const l=i.value.length;try{i.setSelectionRange(l,l)}catch(e){}}}}
 let insRange='fy',insBy='card',insSel=null,insMetric='spend';
 function setInsMetric(m){insMetric=m;insSel=null;renderInsights()}
 function setInsRange(r){insRange=r;insSel=null;renderInsights()}function setInsBy(b){insBy=b;renderInsights()}function setInsSel(k){insSel=k;renderInsights()}
@@ -538,7 +568,8 @@ function renderInsights(){
   const brk=shown.map(g=>g.other?`<div class="insrow"><div class="nm muted">Other (${g.n} ${insBy==='bank'?'banks':'cards'})</div><div class="amt">${money(g.total)}<span>${Math.round(g.total/total*100)}%</span></div><div class="tr"><i style="width:${g.total/top.total*100}%"></i></div></div>`:`<div class="insrow"><div class="nm bnrow">${g.c?bankTag(g.c.bankId):''}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nameOf(g))}${insBy==='card'&&g.c&&g.c.last4?` <span class="muted">·${esc(g.c.last4)}</span>`:''}</span></div><div class="amt">${money(g.total)}<span>${Math.round(g.total/total*100)}%</span></div><div class="tr"><i style="width:${g.total/top.total*100}%"></i></div></div>`).join('');
   document.getElementById('insBody').innerHTML=`<div class="inskpis"><div class="panel inskpi"><div class="k">${isR?'Rewards':'Total'}</div><div class="v">${money(total)}</div><div class="s">${months.length} month${months.length===1?'':'s'}</div></div><div class="panel inskpi"><div class="k">Avg / month</div><div class="v">${money(avg)}</div><div class="s">&nbsp;</div></div><div class="panel inskpi"><div class="k">Peak</div><div class="v">${money(byM[topM])}</div><div class="s">${lab(topM)}</div></div></div>
   <div class="panel inspanel"><h3>Monthly ${isR?'rewards':'spend'}</h3><div class="insdetail">${detail}</div><div class="insbars">${bars}</div><div class="insx">${xl}</div></div>
-  <div class="panel inspanel"><h3>${isR?'Where rewards came from':'Where it went'}</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div>`;
+  <div class="panel inspanel"><h3>${isR?'Where rewards came from':'Where it went'}</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div><div id="insMerch"></div>`;
+  _mc={all:buildMerchants(tx,val),total,isR,months,lab,mn,val};if(insMerch&&!_mc.all.some(g=>g.key===insMerch))insMerch=null;renderMerchPanel();
 }
 ['renderHome','renderCards','renderTransactions','renderInsights','renderAis'].forEach(n=>{const f=window[n];window[n]=function(){return withHolder(f)}});
 function render(){if(cardPageOpen()&&detailDialog.dataset.cardId&&state.cards.some(c=>c.id===detailDialog.dataset.cardId))openCard(detailDialog.dataset.cardId);renderHolderBar();renderHome();const _t=localStorage.getItem('cardly-tab')||'home';_dirty=new Set(['cards','transactions','insights','ais']);_dirty.delete('home');renderTabIfDirty(_t);updateNotifyBtn();maybeSendNotifications()}
