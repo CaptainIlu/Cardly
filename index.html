@@ -229,6 +229,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 <div class="formrow" id="cardBillingRow"><div class="field"><label class="label">Statement day</label><input id="cardStatementDay" name="statementDay" type="number" min="1" max="31" required></div><div class="field"><label class="label">Due day</label><input id="cardDueDay" name="dueDay" type="number" min="1" max="31" required></div></div>
 <div class="field"><label class="label">Rewards rate (%)</label><input name="rewardRatePct" type="number" min="0" step="0.01" value="0"></div><div class="field" id="cardLimitField"><label class="label">Credit limit (₹)</label><input name="creditLimit" type="number" min="0" step="1" value="0"></div>
 <div class="field"><label class="checkfield"><input type="checkbox" id="cardLifetimeFree" name="lifetimeFree"> Lifetime free (no annual fee)</label></div>
+<div class="field" id="cardRefundBillField"><label class="checkfield"><input type="checkbox" id="cardRefundBill"> Refunds after the bill date reduce the current bill</label><div class="muted" style="font-size:12px;margin-top:4px">For banks that cut the bill when a purchase from that statement is refunded. The refund is not counted as a payment, so AIS stays unchanged.</div></div>
 <div class="field" id="cardArchivedField" hidden><label class="checkfield"><input type="checkbox" id="cardArchived"> Archived (card closed)</label><div class="muted" style="font-size:12px;margin-top:4px">Hidden from Home, bills, renewals and milestones. Transactions and AIS totals are kept.</div></div>
 <div id="feeDetailsGroup">
 <div class="formrow"><div class="field"><label class="label">Annual fee</label><input id="cardAnnualFee" name="annualFee" type="number" min="0" step="0.01" value="0"></div><div class="field"><label class="label">Renewal date (day-month)</label><input id="cardRenewalDate" name="renewalDate" type="date"></div></div>
@@ -354,14 +355,19 @@ function spend(cardId,type,mm){const c=state.cards.find(x=>x.id===cardId);if(!mm
 function isFeeWaiver(m){if(m&&m.purpose)return m.purpose==='WAIVER';return !!m&&(m.autoFeeWaiver||/fee\s*waiver/i.test(m.name||''))}
 function milestonePeriodLabel(type,m){if(type==='SPECIFIC_DAYS')return 'Every month · '+((m&&m.days)||[]).map(daysLabel).join(' & ')+(m&&m.reward?' · '+m.reward:'');if(type==='CUSTOM')return m&&m.startDate?`Custom · ${displayDate(m.startDate)} → ${displayDate(m.endDate)}`:'Custom';if(type==='FINANCIAL_YEAR')return 'Financial year · '+fyRange().label;return type==='MEMBERSHIP_YEAR'?(isFeeWaiver(m)?'Fee waiver · membership year':'Membership year'):type.replaceAll('_',' ')}
 function milestoneNote(c,m,v){if(isWindows(m)){const i=windowInfo(m,c);if(!i)return '';const need=Number(m.targetAmount);return `Next: ${esc(displayDate(i.focus))}${i.focus===today()?' (today)':''} — ${i.v>=need?'✓ done':money(Math.max(0,need-i.v))+' to go'}<br>This month: ${windowChips(i)}`}const[,e]=periodRange(m.periodType,c,m);if(!e)return '';const target=Number(m.targetAmount);if(m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m))return v>=target?`🎉 Fee waived for the ${esc(displayDate(nextRenewalDate(c)))} renewal`:`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))} to waive next year's fee`;return v>=target?'✓ Target reached':`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))}`}
+/* Some banks reduce the current bill when a refund lands after the statement was generated (for a purchase that was on that statement).
+   That credit lowers what is owed but is NOT a payment, so AIS totals are untouched. Opt-in per card: c.refundsReduceBill */
+function isBillCredit(c,r){if(!c.refundsReduceBill||!c.billDate)return false;if(r.type==='REFUND'){if(!(r.date>=c.billDate))return false;const o=state.transactions.find(x=>x.id===r.refundOf);return !!o&&o.date<c.billDate}return false}
+function billRefundCredit(c){if(!c.refundsReduceBill||!c.billDate)return 0;let sum=state.transactions.filter(t=>t.cardId===c.id&&isBillCredit(c,t)).reduce((a,t)=>a+Number(t.amount||0),0);
+  state.transactions.forEach(t=>{if(t.cardId===c.id&&t.type==='PURCHASE'&&t.status==='REFUNDED'&&t.refundDate&&t.refundDate>=c.billDate&&t.date<c.billDate)sum+=Number(t.amount||0)});return sum}
 function paidForCurrentBill(c){return state.transactions.filter(t=>t.cardId===c.id&&t.type==='PAYMENT'&&t.status!=='REFUNDED'&&t.date>=(c.billDate||'0000-01-01')).reduce((a,t)=>a+Number(t.amount||0),0)}
 function status(c){
   const bill=Number(c.currentBill||0), paid=paidForCurrentBill(c);
-  if(bill<=0||paid>=bill)return 'paid';
+  if(bill<=0||paid+billRefundCredit(c)>=bill)return 'paid';
   const due=dueDate(c);
   return due&&today()>due?'overdue':'unpaid';
 }
-function outstanding(c){return Math.max(0,Number(c.currentBill||0)-paidForCurrentBill(c))}
+function outstanding(c){return Math.max(0,Number(c.currentBill||0)-paidForCurrentBill(c)-billRefundCredit(c))}
 function fyRange(){const t=today(),y=Number(t.slice(0,4)),m=Number(t.slice(5,7)),s=m>=4?y:y-1;return {start:`${s}-04-01`,end:`${s+1}-03-31`,label:`FY ${s}-${String(s+1).slice(2)}`}}
 
 function holders(){return (state.settings&&Array.isArray(state.settings.holders)&&state.settings.holders.length)?state.settings.holders:[{id:'me',name:'Me'}]}
@@ -450,7 +456,7 @@ function cardRowHtml(c){
   const arch=c.active===false,st=status(c),due=dueDate(c),cms=arch?[]:state.milestones.filter(m=>m.cardId===c.id&&m.active!==false),feeBadge=c.lifetimeFree?'<span class="badge">LTF</span>':(feeDueSoon(c)?`<span class="badge warn">Fee in ${daysUntil(nextRenewalDate(c))}d</span>`:'');
   const metaLine=isDebit?`${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''}`:`${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''} · Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(due))}`;
   const badges=arch?'<span class="badge">ARCHIVED</span>':isDebit?`<span class="badge">DEBIT</span>${feeBadge}`:`<span class="badge ${st}">${st.toUpperCase()}</span>${feeBadge}`;
-  const billLine=(isDebit||arch)?'':`<div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>`;
+  const billLine=(isDebit||arch)?'':`<div class="meta" style="margin-top:10px">Bill ${money(c.currentBill)}${billRefundCredit(c)>0?` · Refund −${money(billRefundCredit(c))}`:''} · Paid ${money(paidForCurrentBill(c))} · Outstanding ${money(outstanding(c))}</div>`;
   return `<div class="panel cardrow clickable" onclick="openCard('${c.id}')"><div class="cardmain"><div><div class="cardname">${esc(c.name)}</div><div class="meta">${metaLine}</div></div><div class="badges">${badges}</div></div>${billLine}${arch?'':utilBar(c)}${cms.length?`<div class="card-milestones"><div class="milestone-label">Milestones</div>${cms.map(m=>{const v=isWindows(m)?(windowInfo(m,c)||{v:0}).v:spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone"><div class="milestonehead"><span>${esc(m.name)} · ${money(v)} / ${money(m.targetAmount)}</span><span>${Math.round(p)}%</span></div><div class="bar"><div class="fill" style="width:${p}%"></div></div>${note?`<div class="meta">${note}</div>`:''}</div>`}).join('')}</div>`:''}</div>`;
 }
 function setCardBankFilter(id){try{if(localStorage.getItem('cardly-card-bank')===id)id='all'}catch(e){}try{localStorage.setItem('cardly-card-bank',id)}catch(e){}renderCards()}
@@ -884,7 +890,7 @@ function billGraceDays(){const v=state.settings&&state.settings.billGraceDays;re
 function feeRenewalDays(){return Number(state.settings&&state.settings.feeRenewalDays)||21}
 function utilWarnPct(){return Number(state.settings&&state.settings.utilWarnPct)||30}
 function creditLimit(c){return Number(c.creditLimit)||0}
-function unbilledSpend(c){const ls=latestStatementDate(c);if(!ls)return 0;let start=ls;if(c.billDate&&c.billDate<ls)start=c.billDate;const td=today();const buy=state.transactions.filter(t=>t.cardId===c.id&&t.type==='PURCHASE'&&t.status!=='REFUNDED'&&t.date>=start&&t.date<=td).reduce((a,t)=>a+Number(t.amount),0),back=state.transactions.filter(t=>t.cardId===c.id&&t.type==='REFUND'&&t.date>=start&&t.date<=td).reduce((a,t)=>a+Number(t.amount),0);return Math.max(0,buy-back)}
+function unbilledSpend(c){const ls=latestStatementDate(c);if(!ls)return 0;let start=ls;if(c.billDate&&c.billDate<ls)start=c.billDate;const td=today();const buy=state.transactions.filter(t=>t.cardId===c.id&&t.type==='PURCHASE'&&t.status!=='REFUNDED'&&t.date>=start&&t.date<=td).reduce((a,t)=>a+Number(t.amount),0),back=state.transactions.filter(t=>t.cardId===c.id&&t.type==='REFUND'&&t.date>=start&&t.date<=td&&!isBillCredit(c,t)).reduce((a,t)=>a+Number(t.amount),0);return Math.max(0,buy-back)}
 function limitUsed(c){return c.cardType==='DEBIT'?0:outstanding(c)+unbilledSpend(c)}
 function utilPct(c){const l=creditLimit(c);return l>0?limitUsed(c)/l*100:null}
 function utilCls(p){return p>=75?'bad':p>utilWarnPct()?'warn':'good'}
@@ -992,7 +998,7 @@ async function deleteCardById(cid){
 function openEditCard(cardId){
   const c=state.cards.find(x=>x.id===cardId);if(!c)return;
   cardForm.reset();milestoneInputs.innerHTML='';
-  cardForm.dataset.cardId=cardId;deleteCardBtn.style.display='';cardArchivedField.hidden=false;cardArchived.checked=c.active===false;
+  cardForm.dataset.cardId=cardId;deleteCardBtn.style.display='';cardArchivedField.hidden=false;cardArchived.checked=c.active===false;cardRefundBill.checked=!!c.refundsReduceBill;
   cardDialogTitle.textContent='Edit card';
   cardCreateOnly.hidden=true;
   saveCard.textContent='Save Changes';
@@ -1084,10 +1090,10 @@ function openCard(cardId){
     <div class="sub">${esc(c.network||'')} ${c.last4?'· •••• '+esc(c.last4):''}${isDebit?' · Debit card':''}</div>
     ${c.active===false?`<div class="panel cardrow" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div class="cardname">Archived · card closed</div><div class="meta">Hidden from Home, bills and milestones. Transactions and AIS totals are kept.</div></div><button class="btn" onclick="unarchiveCard('${c.id}')">Unarchive</button></div>`:''}
     ${isDebit?'':`<div class="detail-grid" style="margin-top:14px">
-      <div class="detail-box"><div class="label">Current bill</div><strong>${money(c.currentBill)}</strong></div>
+      <div class="detail-box"><div class="label">Current bill</div><strong>${money(Math.max(0,Number(c.currentBill||0)-billRefundCredit(c)))}</strong>${billRefundCredit(c)>0?`<div class="meta"><s>${money(c.currentBill)}</s> · after refund</div>`:''}</div>
       <div class="detail-box"><div class="label">Paid</div><strong>${money(paidForCurrentBill(c))}</strong></div>
       <div class="detail-box"><div class="label">Outstanding</div><strong>${money(outstanding(c))}</strong></div>
-    </div>
+    </div>${billRefundCredit(c)>0?`<div class="meta" style="margin-top:8px">The bill was reduced by a refund of ${money(billRefundCredit(c))} received after the bill date. It lowers what you owe but isn’t counted as a payment, so AIS isn’t affected.</div>`:''}
     <div class="detail-section panel cardrow">
       <div class="cardmain"><div><div class="cardname">Payment status</div><div class="meta">Bill date ${esc(displayDate(effectiveBillDate(c)))} · Due date ${esc(displayDate(dueDate(c)))}</div></div><span class="badge ${st}">${st.toUpperCase()}</span></div>
       <div class="modalfoot payment-actions" style="margin-top:12px"><button class="btn" onclick="openBill('${c.id}')">Update Bill</button><button class="btn" onclick="openPayment('${c.id}')">+ Add Payment</button>${st==='paid'?'<button class="btn" disabled>✓ Bill Paid</button>':`<button class="btn primary" onclick="openPayment('${c.id}',true)">Mark Bill Paid</button>`}</div>
@@ -1124,7 +1130,7 @@ function openPayment(cardId,markPaid=false){
   const paid=paidForCurrentBill(c), out=outstanding(c);
   paymentAmount.value=markPaid&&out>0?out:'';
   document.getElementById('savePayment').textContent=markPaid?'Mark Bill Paid':'Add Payment';
-  paymentSummary.innerHTML=`<div class="cardmain"><div><div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}</span></div><div class="meta">Bill ${money(c.currentBill)} · Paid ${money(paid)} · Outstanding ${money(out)}</div></div><span class="badge ${status(c)}">${status(c).toUpperCase()}</span></div>`;
+  paymentSummary.innerHTML=`<div class="cardmain"><div><div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}</span></div><div class="meta">Bill ${money(c.currentBill)}${billRefundCredit(c)>0?` · Refund −${money(billRefundCredit(c))}`:''} · Paid ${money(paid)} · Outstanding ${money(out)}</div></div><span class="badge ${status(c)}">${status(c).toUpperCase()}</span></div>`;
   paymentDialog.showModal();
 }
 function openTxnFor(cardId){
@@ -1172,13 +1178,13 @@ cardForm.onsubmit=async e=>{
     const f=new FormData(e.target),editingId=cardForm.dataset.cardId,fee=readFeeFields(f),bankId=bankFromForm(f),cardType=f.get('cardTypeSelect')==='DEBIT'?'DEBIT':'CREDIT';
     if(editingId){
       const c=state.cards.find(x=>x.id===editingId);if(!c)throw new Error('Card not found.');
-      c.active=!cardArchived.checked;c.holderId=f.get('holder')||'me';c.bankId=bankId;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.cardType=cardType;c.statementDay=cardType==='DEBIT'?0:Number(f.get('statementDay'));c.dueDay=cardType==='DEBIT'?0:Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);c.creditLimit=cardType==='DEBIT'?0:Number(f.get('creditLimit')||0);
+      c.active=!cardArchived.checked;c.refundsReduceBill=cardRefundBill.checked;c.holderId=f.get('holder')||'me';c.bankId=bankId;c.name=f.get('name');c.network=f.get('network');c.last4=f.get('last4');c.cardType=cardType;c.statementDay=cardType==='DEBIT'?0:Number(f.get('statementDay'));c.dueDay=cardType==='DEBIT'?0:Number(f.get('dueDay'));c.rewardRatePct=Number(f.get('rewardRatePct')||0);c.creditLimit=cardType==='DEBIT'?0:Number(f.get('creditLimit')||0);
       c.lifetimeFree=fee.lifetimeFree;c.annualFee=fee.annualFee;c.renewalDate=fee.renewalDate;
       await put('cards',c);
       await syncFeeWaiverMilestone(c,fee.waiverAmt);
       cardDialog.close();await load();toast('✓ Card updated');openCard(c.id);
     }else{
-      const card={id:id(),holderId:f.get('holder')||activeHolder(),bankId:bankId,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),cardType,statementDay:cardType==='DEBIT'?0:Number(f.get('statementDay')),dueDay:cardType==='DEBIT'?0:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),creditLimit:cardType==='DEBIT'?0:Number(f.get('creditLimit')||0),currentBill:cardType==='DEBIT'?0:Number(f.get('currentBill')||0),billDate:cardType==='DEBIT'?'':(f.get('billDate')?dateForStorage(f.get('billDate')):today()),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
+      const card={id:id(),refundsReduceBill:cardRefundBill.checked,holderId:f.get('holder')||activeHolder(),bankId:bankId,name:f.get('name'),network:f.get('network'),last4:f.get('last4'),cardType,statementDay:cardType==='DEBIT'?0:Number(f.get('statementDay')),dueDay:cardType==='DEBIT'?0:Number(f.get('dueDay')),rewardRatePct:Number(f.get('rewardRatePct')||0),creditLimit:cardType==='DEBIT'?0:Number(f.get('creditLimit')||0),currentBill:cardType==='DEBIT'?0:Number(f.get('currentBill')||0),billDate:cardType==='DEBIT'?'':(f.get('billDate')?dateForStorage(f.get('billDate')):today()),active:true,lifetimeFree:fee.lifetimeFree,annualFee:fee.annualFee,renewalDate:fee.renewalDate};
       await put('cards',card);
       await syncFeeWaiverMilestone(card,fee.waiverAmt);
       for(const r of document.querySelectorAll('.milestone-edit'))await put('milestones',{id:id(),cardId:card.id,name:r.querySelector('.mname').value,periodType:r.querySelector('.mtype').value,startDate:r.querySelector('.mstart').value||undefined,endDate:r.querySelector('.mend').value||undefined,targetAmount:Number(r.querySelector('.mtarget').value),active:true});
@@ -1228,6 +1234,8 @@ refundForm.onsubmit=async e=>{e.preventDefault();const b=document.getElementById
     const date=dateForStorage(refundForm.refundDate.value);
     if(rid){const r=state.transactions.find(x=>x.id===rid);r.amount=amount;r.date=date;await put('transactions',r)}
     else await put('transactions',{id:id(),cardId:orig.cardId,date,merchant:orig.merchant,amount,type:'REFUND',status:'COMPLETED',refundOf:orig.id,refundDate:''});
+    const rc=state.cards.find(x=>x.id===orig.cardId);
+    if(rc&&!rc.refundsReduceBill&&rc.billDate&&Number(rc.currentBill)>0&&date>=rc.billDate&&orig.date<rc.billDate&&confirm(`This refund is dated after the bill date (${displayDate(rc.billDate)}) for a purchase that was on that bill.\n\nDoes ${bankName(rc.bankId)} reduce the current bill for such refunds?\n\nOK = yes — reduce the bill (turns this on for ${rc.name}; it is not counted as a payment, so AIS is unaffected)\nCancel = no — leave the bill as it is`)){rc.refundsReduceBill=true;await put('cards',rc)}
     refundDialog.close();await load();toast(rid?'✓ Refund updated':'✓ Refund added');if(cardDetailOpen())openCard(orig.cardId)
   }catch(err){toast('Could not save refund: '+err.message)}finally{b.disabled=false;b.textContent=refundForm.dataset.refundId?'Save Changes':'Add Refund'}};
 async function undoRefund(txnId){const t=state.transactions.find(x=>x.id===txnId);if(!t)return;t.status='COMPLETED';t.refundDate='';await put('transactions',t);await load();toast('✓ Refund removed');if(cardDetailOpen())openCard(t.cardId)};
