@@ -147,7 +147,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
     </div>
 
     <div class="tabpane" id="tab-transactions" hidden>
-      <div class="sectionhead"><div><div class="sectiontitle">Transactions</div><div class="muted" id="txnFySummary"></div></div><button class="btn primary addbtn" id="addTxn" title="Add transaction" aria-label="Add transaction">+</button></div>
+      <div class="sectionhead"><div><div class="sectiontitle">Transactions</div><div class="muted" id="txnFySummary"></div></div><div style="display:flex;gap:8px;align-items:center"><button class="btn" onclick="reconOpen(localStorage.getItem('cardly-txn-card')==='all'?'':localStorage.getItem('cardly-txn-card'))">Reconcile</button><button class="btn primary addbtn" id="addTxn" title="Add transaction" aria-label="Add transaction">+</button></div></div>
       <div class="toolbar"><input class="search" id="txnSearch" placeholder="Search merchant, card or bank..."></div>
       <div class="chips" id="txnCardChips"></div>
       <div id="transactions"></div>
@@ -264,6 +264,12 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 <div class="meta">Changing the bill date starts a new current-bill period. Older payment transactions remain in the history but won't reduce this bill.</div>
 <div class="modalfoot"><button type="button" class="btn" onclick="billDialog.close()">Cancel</button><button class="btn primary" id="saveBill">Save Bill</button></div>
 </form></div></dialog>
+
+<dialog id="pdfPwDialog"><form method="dialog" class="modal" id="pdfPwForm" style="max-width:380px"><div class="modalhead"><h2>PDF password</h2><button type="button" class="iconbtn" id="pdfPwX">×</button></div><p class="meta" id="pdfPwMsg" style="margin:0 0 10px">This statement is password protected.</p><input type="password" id="pdfPwInput" autocomplete="off" placeholder="Password" style="width:100%;margin-bottom:10px"><label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:14px"><input type="checkbox" id="pdfPwRemember" checked style="width:auto"> Remember for this card on this device</label><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="pdfPwCancel">Cancel</button><button type="submit" class="btn primary">Unlock</button></div></form></dialog>
+<dialog id="reconDialog"><div class="modal" style="max-height:88vh;overflow-y:auto"><div class="modalhead"><h2>Reconcile statement</h2><button class="iconbtn" onclick="reconDialog.close()">×</button></div><div style="text-align:right"><button class="btn" id="reconForgetPw" hidden onclick="reconForgetPw()" style="font-size:12px;padding:4px 10px">Forget saved PDF passwords</button></div>
+<div class="form"><div class="formrow"><div class="field"><label class="label">Card</label><select id="reconCard"></select></div></div>
+<div id="reconDrop" class="panel" style="padding:16px;text-align:center;border-style:dashed;cursor:pointer;margin-bottom:12px" onclick="document.getElementById('reconFile').click()"><input id="reconFile" type="file" accept="application/pdf,.pdf" style="display:none"><strong id="reconDropTitle" style="display:block">Drop a statement PDF here or tap to choose</strong><div class="meta" style="margin-top:4px">Read on this device only — nothing is uploaded.</div></div>
+<div id="reconBody"></div></div></div></dialog>
 
 <dialog id="paymentDialog"><div class="modal"><div class="modalhead"><h2>Add bill payment</h2><button class="iconbtn" onclick="paymentDialog.close()">×</button></div>
 <form id="paymentForm" class="form">
@@ -793,6 +799,159 @@ async function restoreFromFb(fromGate){try{if(fromGate&&!fbConfig()){const t=pro
 async function disconnectFb(){if(!confirm('Disconnect Firebase backup on this device? Your data and the backup already in Firebase are not touched. You will be signed out here.'))return;try{if(_fb)await _fb.auth.signOut(_fb.au)}catch(e){}['cardly-fb-meta'].forEach(k=>dLS.del(k));clearTimeout(fbTimer);fbErr='';renderFbSettings()}
 document.getElementById('fbConnectBtn').onclick=connectFb;document.getElementById('fbNowBtn').onclick=()=>fbNow(true);document.getElementById('fbRestoreBtn').onclick=()=>restoreFromFb(false);document.getElementById('fbRestoreOffBtn').onclick=()=>restoreFromFb(false);document.getElementById('fbDisconnectBtn').onclick=disconnectFb;document.getElementById('fbRestoreGate').onclick=()=>restoreFromFb(true);document.getElementById('fbAutoChk').onchange=e=>{setFMeta({auto:e.target.checked});if(e.target.checked&&fMeta().dirty)fbSchedule();renderFbSettings()};
 renderFbSettings();if(fbOn()&&fbConfig()){fbInit().then(()=>{if(fMeta().dirty)fbSchedule()}).catch(()=>{})}
+/* ===== Statement reconciliation (PDF → compare with a card's transactions). Runs fully in the browser ===== */
+const PDFJS_VER='3.11.174',PDFJS_URL='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_VER+'/pdf.min.js',PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/'+PDFJS_VER+'/pdf.worker.min.js';
+let _recon=null;
+function loadPdfJs(){return new Promise((res,rej)=>{if(window.pdfjsLib){res();return}const s=document.createElement('script');s.src=PDFJS_URL;s.onload=()=>{try{pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER}catch(e){}res()};s.onerror=()=>rej(new Error('Could not load the PDF reader. Check your internet connection.'));document.head.appendChild(s)})}
+/* ---- saved PDF passwords (opt-in, this device only) ---- */
+function pdfPwStore(){try{return JSON.parse(localStorage.getItem('cardly-pdf-pw')||'{}')}catch(e){return{}}}
+function pdfPwSave(o){try{localStorage.setItem('cardly-pdf-pw',JSON.stringify(o))}catch(e){}}
+function reconForgetPw(){if(!confirm('Forget all saved statement PDF passwords on this device?'))return;pdfPwSave({});toast('Saved passwords removed');reconRefreshPwBtn()}
+function reconRefreshPwBtn(){const b=document.getElementById('reconForgetPw');if(b)b.hidden=!Object.keys(pdfPwStore()).length}
+function pdfAskPw(wrong){return new Promise(res=>{const d=document.getElementById('pdfPwDialog'),inp=document.getElementById('pdfPwInput');let done=false;const fin=v=>{if(done)return;done=true;d.close();res(v)};
+  document.getElementById('pdfPwMsg').textContent=wrong?'That password didn’t work. Try again.':'This statement is password protected (often your name or date of birth).';inp.value='';
+  document.getElementById('pdfPwForm').onsubmit=e=>{e.preventDefault();if(!inp.value)return;fin({pw:inp.value,remember:document.getElementById('pdfPwRemember').checked})};
+  document.getElementById('pdfPwCancel').onclick=document.getElementById('pdfPwX').onclick=()=>fin(null);d.oncancel=e=>{e.preventDefault();fin(null)};d.showModal();setTimeout(()=>inp.focus(),50)})}
+/* open a PDF, trying: no password → saved passwords (selected card first) → ask */
+async function pdfOpen(buf,cardId){await loadPdfJs();const tryPw=async pw=>{const task=pdfjsLib.getDocument({data:new Uint8Array(buf).slice(),password:pw});try{return await task.promise}catch(e){if(e&&e.name==='PasswordException')return null;throw new Error('Could not open this PDF.')}};
+  let doc=await tryPw(undefined);if(doc)return doc;const st=pdfPwStore(),cands=[...new Set([st[cardId],...Object.values(st)].filter(Boolean))];
+  for(const pw of cands){doc=await tryPw(pw);if(doc)return doc}
+  for(let i=0;i<4;i++){const r=await pdfAskPw(i>0);if(!r)throw new Error('Password needed to read this PDF.');doc=await tryPw(r.pw);if(doc){if(cardId&&r.remember){const o=pdfPwStore();o[cardId]=r.pw;pdfPwSave(o);reconRefreshPwBtn()}return doc}}
+  throw new Error('The PDF password was not accepted.')}
+/* rebuild visual rows (with positions) from text items */
+async function pdfToRows(doc){const rows=[];
+  for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n),tc=await page.getTextContent();
+    const items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],w:i.width||0}));
+    items.sort((a,b)=>b.y-a.y||a.x-b.x);let cur=null;
+    items.forEach(it=>{if(cur&&Math.abs(cur.y-it.y)<=3){cur.items.push(it)}else{cur={page:n,y:it.y,items:[it]};rows.push(cur)}});}
+  rows.forEach(r=>{r.items.sort((a,b)=>a.x-b.x);let s='',px=null;r.offs=[];r.items.forEach(it=>{if(px!==null){const gap=it.x-px;s+=gap>7?'   ':gap>1.2?' ':''}r.offs.push(s.length);s+=it.s;px=it.x+it.w});r.text=s.trim();r.raw=s});
+  return rows}
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+const MONRE='jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+const monNum=s=>MON[String(s).slice(0,3).toLowerCase()]||0;
+function isoFrom(d,m,y){y=Number(y);if(y<100)y+=2000;m=isNaN(m)?monNum(m):Number(m);d=Number(d);if(!m||m>12||!d||d>31)return null;return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}
+/* date at the start of a line. Returns {iso}|{md:[m,d]} (no year printed) and the rest of the line */
+function leadDate(line){let m;
+  if(m=line.match(/^(\d{4})-(\d{2})-(\d{2})(?!\d)/)){const iso=isoFrom(m[3],m[2],m[1]);if(iso)return fin({iso},line,m)}
+  if(m=line.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?!\d)/)){const iso=isoFrom(m[1],m[2],m[3]);if(iso)return fin({iso},line,m)}
+  if(m=line.match(new RegExp('^(\\d{1,2})[\\s\\-]('+MONRE+'),?[\\s\\-](\\d{2}|\\d{4})(?!\\d)','i'))){const iso=isoFrom(m[1],m[2],m[3]);if(iso)return fin({iso},line,m)}
+  if(m=line.match(new RegExp('^(\\d{1,2})\\s?('+MONRE+')(?![a-z])(?![\\s\\-]\\d{2,4}(?!\\d))','i'))){const mo=monNum(m[2]);if(mo&&Number(m[1])<=31)return fin({md:[mo,Number(m[1])]},line,m)}
+  if(m=line.match(new RegExp('^('+MONRE+')\\.?\\s+(\\d{1,2})(?!\\d)(?![\\/\\-])','i'))){const mo=monNum(m[1]);if(mo&&Number(m[2])<=31)return fin({md:[mo,Number(m[2])]},line,m)}
+  return null}
+function fin(d,line,m){let rest=line.slice(m[0].length).trim();
+  rest=rest.replace(/^(?:[·|•]\s*)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:[AP]M)?\s*/i,'');                               // time of day
+  rest=rest.replace(/^(?:\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}[\s\-](?:[A-Za-z]{3,9})[\s\-]\d{2,4})\s+(?=\S)/,'');  // second (posting) date
+  rest=rest.replace(/^[·•|\-–]\s*/,'');return{...d,rest}}
+function cleanMerchant(d){return d.replace(/\(\s*(Convert To EMI|Pay in EMIs)\s*\)/gi,'').replace(/\s+356\s*$/,'').replace(/\s{2,}/g,' ').replace(/\s+/g,' ').trim()}
+function classifyStm(desc,credit){const d=desc.toLowerCase();
+  if(credit){if(/refund|reversal|return|chargeback|dispute/.test(d)&&!/cashback credit/.test(d))return 'REFUND';if(/payment|upi|bbps|imps|neft|rtgs|auto.?debit|direct debit|bill\s*pay|ibank|net.?banking|mobile banking|billdesk|thank/.test(d))return 'PAYMENT';if(/cashback|reward|points|waiver|bonus|interest.*(reversal|credit)/.test(d))return 'CREDIT';return 'REFUND'}
+  if(/\b(annual|joining|renewal|late payment|finance|interest|igst|cgst|sgst|gst|processing|overlimit|fee|charges?|surcharge)\b/.test(d)&&!/swiggy|zomato|amazon|flipkart/.test(d))return 'CHARGE';return 'PURCHASE'}
+const AMT_RE=/(?:^|\s)([+\-−])?\s*[₹`]?\s*([+\-−])?\s*([\d,]*\d\.\d{2})\s*(CR|DR|C|D)?\s*$/i,AMT2_RE=/(?:^|\s)[₹`]?\s*([\d,]*\d\.\d{2})\s*(CR|DR)\s+[₹`]?\s*[\d,]*\d\.\d{2}\s*(?:CR|DR)\s*$/i;
+function parseStmtLines(lines){const out=[];
+  for(let li=0;li<lines.length;li++){const raw=lines[li];
+    if(/^(CR|Cr)$/.test(raw.trim())&&out.length&&out[out.length-1]._li===li-1){const p=out[out.length-1];p.credit=true;p.kind=classifyStm(p.desc,true);continue}      // Amex: "CR" printed on the next row
+    const ld=leadDate(raw);if(!ld)continue;let amount,credit,body;
+    const a2=ld.rest.match(AMT2_RE);
+    if(a2){amount=Number(a2[1].replace(/,/g,''));credit=/^c/i.test(a2[2]);body=ld.rest.slice(0,a2.index)}                                    // "amount Dr   running balance Cr"
+    else{const am=ld.rest.match(AMT_RE);if(!am)continue;amount=Number(am[3].replace(/,/g,''));const sign=am[1]||am[2]||'';credit=/^c/i.test(am[4]||'')||sign==='+'||sign==='-'||sign==='−';body=ld.rest.slice(0,am.index)}
+    if(!(amount>0))continue;let desc=body.trim();
+    desc=desc.replace(/\s+(-?\d+\s+)?INR\s+[\d,]+\.\d{2}\s*$/,'').replace(/^R\d{4,}\s+/,'');                                                   // BOB reference / points / source amount
+    const seg=desc.split(/\s{2,}/).filter(Boolean);desc=cleanMerchant(seg.length?seg[0]:desc);
+    if(!desc||desc.length<2||/^(opening|closing|previous) balance|net outstanding|^total\b/i.test(desc))continue;
+    out.push({date:ld.iso||null,md:ld.md||null,desc,amount,credit,kind:classifyStm(desc,credit),raw:raw.replace(/\s+/g,' ').slice(0,160),_li:li})}
+  return out}
+const pad2=n=>String(n).padStart(2,'0');
+function convDate(s){let m=s.match(/(\d{1,2})[\/\-. ]([\dA-Za-z]{2,9}),?[\/\-. ](\d{2,4})/);return m?isoFrom(m[1],isNaN(m[2])?m[2]:m[2],m[3]):null}
+function stmtPeriod(lines,items,sum){const re=/(\d{1,2}[\/\-.][\dA-Za-z]{2,9}[\/\-.]\d{2,4}|\d{1,2} [A-Za-z]{3,9},? \d{2,4})\s*(?:to|-|–|till|through)\s*(\d{1,2}[\/\-.][\dA-Za-z]{2,9}[\/\-.]\d{2,4}|\d{1,2} [A-Za-z]{3,9},? \d{2,4})/i;
+  for(const l of lines.slice(0,150)){const m=l.match(re);if(m){const a=convDate(m[1]),b=convDate(m[2]);if(a&&b&&b>a){const span=(new Date(b)-new Date(a))/864e5;if(span>=20&&span<=40)return{start:a,end:b}}}}
+  if(sum&&sum.stmtDate){const e=sum.stmtDate,d=new Date(e);d.setMonth(d.getMonth()-1);d.setDate(d.getDate()+1);return{start:ymd(d),end:e,guess:true}}
+  const ds=items.map(i=>i.date).filter(Boolean).sort();return ds.length?{start:ds[0],end:ds[ds.length-1],guess:true}:null}
+function resolveYears(items,period,sum){const pe=period&&period.end?period.end:(sum&&sum.stmtDate)||ymd(new Date()),py=Number(pe.slice(0,4)),ps=period&&period.start||null;
+  items.forEach(it=>{if(it.date||!it.md)return;const[m,d]=it.md;let best=null;[py,py-1,py+1].forEach(y=>{const iso=`${y}-${pad2(m)}-${pad2(d)}`;if(best)return;if(ps?(iso>=addDaysStr(ps,-5)&&iso<=addDaysStr(pe,5)):(iso<=addDaysStr(pe,5)&&iso>=addDaysStr(pe,-370)))best=iso});it.date=best||`${py}-${pad2(m)}-${pad2(d)}`});
+  return items.filter(i=>i.date)}
+/* label → value lookup using positions: value to the right on the same row, or directly beneath the label (table headers) */
+const SUM_DEFS=[['totalDue',/total\s+(?:amount|payment)\s+due(?:\s*\(tad\))?|\btotal\s+outstanding\b|\bnet\s+outstanding\b/i,'amt'],['minDue',/minimum\s+(?:amount|payment)\s+due(?:\s*\(mad\))?/i,'amt'],['dueDate',/payment\s+due\s+date|\bdue\s+date\b/i,'date'],['stmtDate',/statement\s+(?:generation\s+)?date|billing\s+date|\bbill\s+date\b/i,'date']];
+const VAL_RE={amt:/([+\-−])?\s*[₹`]?\s*([\d,]*\d\.\d{2}|\.\d{2})\s*(CR|DR|Cr|Dr)?/,date:/(\d{1,2}[\/\-.][\dA-Za-z]{2,9}[\/\-.]\d{2,4}|\d{1,2} [A-Za-z]{3,9},? \d{2,4})/};
+function stmtSummary(rows){const out={};
+  for(const[key,re,kind]of SUM_DEFS){
+    for(let ri=0;ri<rows.length&&out[key]===undefined;ri++){const r=rows[ri],m=r.raw.match(re);if(!m)continue;
+      const s0=m.index,s1=m.index+m[0].length;let i0=0,i1=r.items.length-1;r.offs.forEach((o,i)=>{if(o<=s0)i0=i;if(o<s1)i1=i});
+      const x0=r.items[i0].x,x1=r.items[i1].x+r.items[i1].w;
+      const parse=txt=>{const vm=txt.match(VAL_RE[kind]);if(!vm)return undefined;if(kind==='date')return convDate(vm[1])||undefined;const v=Number((vm[2].startsWith('.')?'0'+vm[2]:vm[2]).replace(/,/g,''));return (vm[3]&&/^c/i.test(vm[3]))||vm[1]==='-'||vm[1]==='−'?-v:v};
+      let val=parse(r.raw.slice(s1).replace(/^[\s:()*`]+/,''));
+      if(val===undefined){for(let k=ri+1;k<rows.length&&k<=ri+3&&val===undefined;k++){const q=rows[k];if(q.page!==r.page||r.y-q.y>34)continue;const txt=q.items.filter(it=>{const c=it.x+it.w/2;return c>=x0-30&&c<=x1+30}).map(it=>it.s).join(' ');val=parse(txt)}}
+      if(val!==undefined)out[key]=val}}
+  return out}
+function guessCardFromText(lines){const txt=lines.slice(0,80).join(' \n ').toLowerCase();let best=null,sc=0;
+  state.cards.filter(c=>c.last4&&c.cardType!=='DEBIT').forEach(c=>{const re=new RegExp('(?:x|\\*|\\s|-)'+c.last4+'(?!\\d)','i');let s=0;if(re.test(txt))s+=2;const bn=bankName(c.bankId).toLowerCase().split(/\s+/)[0];if(bn&&txt.includes(bn))s+=2;if(txt.includes(String(c.name).toLowerCase().split(/\s+/)[0]))s+=1;if(s>sc){sc=s;best=c}});return sc>=3?best:null}
+const mNorm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function mSim(a,b){a=mNorm(a);b=mNorm(b);if(!a||!b)return 0;if(a===b)return 1;if(a.includes(b)||b.includes(a))return .8;let i=0;const n=Math.min(a.length,b.length);while(i<n&&a[i]===b[i])i++;return i/Math.max(a.length,b.length)}
+const dayDiff=(a,b)=>Math.abs((new Date(a)-new Date(b))/864e5);
+/* nicer merchant names for imported lines: reuse a name you already use, else known brand, else tidy capitalisation */
+const BRANDS=[['amazon','Amazon'],['flipkart','Flipkart'],['swiggy','Swiggy'],['zomato','Zomato'],['uber','Uber'],['olacabs','Ola'],['zepto','Zepto'],['blinkit','Blinkit'],['bigbasket','BigBasket'],['netflix','Netflix'],['spotify','Spotify'],['makemytrip','MakeMyTrip'],['irctc','IRCTC'],['bookmyshow','BookMyShow'],['airtel','Airtel'],['myntra','Myntra'],['jiomart','JioMart'],['dmart','DMart'],['starbucks','Starbucks']];
+function niceMerchant(desc){const n=mNorm(desc);let best=null;const seen=new Map();state.transactions.forEach(t=>{if(t.type==='PURCHASE'&&t.merchant)seen.set(merchKey(t.merchant),(seen.get(merchKey(t.merchant))||0)+1)});
+  const names=new Map();state.transactions.forEach(t=>{if(t.type==='PURCHASE'&&t.merchant&&!names.has(merchKey(t.merchant)))names.set(merchKey(t.merchant),t.merchant.trim())});
+  names.forEach((nm,k)=>{const kn=mNorm(k);if(kn.length>=4&&n.includes(kn)&&(!best||kn.length>mNorm(best).length))best=nm});if(best)return best;
+  for(const[k,v]of BRANDS)if(n.includes(k))return v;
+  let s=desc.replace(/\s+/g,' ').trim();if(s.length>2&&s===s.toUpperCase()&&/[A-Z]/.test(s))s=s.toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());return s}
+function reconcile(items,card,period){
+  const mine=state.transactions.filter(t=>t.cardId===card.id&&t.date>=period.start&&t.date<=period.end);
+  const pool={PURCHASE:mine.filter(t=>t.type==='PURCHASE'),PAYMENT:mine.filter(t=>t.type==='PAYMENT'),REFUND:mine.filter(t=>t.type==='REFUND')},used=new Set(),matched=[],missing=[],other=[];
+  const near=(l,t)=>Math.abs(Number(t.amount)-l.amount)<0.51;
+  const pick=(l,list,maxDays)=>{let best=null,bs=-1;list.forEach(t=>{if(used.has(t.id)||!near(l,t))return;const dd=dayDiff(l.date,t.date);if(dd>maxDays)return;const s=10-dd+mSim(l.desc,t.merchant)*5;if(s>bs){bs=s;best=t}});return best};
+  [...items].sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{
+    if(l.kind==='CREDIT'){other.push(l);return}
+    const key=l.kind==='PAYMENT'?'PAYMENT':l.kind==='REFUND'?'REFUND':'PURCHASE';let t=pick(l,pool[key],key==='PAYMENT'?5:6);
+    if(!t&&key==='REFUND')t=pick(l,pool.PAYMENT,5);
+    if(!t&&key==='REFUND'){t=pick(l,mine.filter(x=>x.type==='PURCHASE'&&x.status==='REFUNDED'),30)}
+    if(t){used.add(t.id);matched.push({l,t})}else missing.push(l)});
+  let extra=mine.filter(t=>!used.has(t.id)).sort(txnNewestFirst);const pairs=[];
+  for(const l of [...missing]){if(l.kind!=='PURCHASE'&&l.kind!=='CHARGE')continue;let best=null,bs=0;extra.forEach(t=>{if(t.type!=='PURCHASE'||pairs.some(p=>p.t===t))return;const sm=mSim(l.desc,t.merchant);if(sm<0.5||dayDiff(l.date,t.date)>6)return;if(sm>bs){bs=sm;best=t}});
+    if(best){pairs.push({l,t:best});extra=extra.filter(x=>x!==best);missing.splice(missing.indexOf(l),1)}}
+  const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
+  return{matched,missing,extra,pairs,other,stmtDebits:sum(items.filter(l=>!l.credit),l=>l.amount),stmtCredits:sum(items.filter(l=>l.credit),l=>l.amount),mineDebits:sum(mine.filter(t=>t.type==='PURCHASE'),t=>Number(t.amount)||0)}}
+function groupMissing(list){const m=new Map();list.forEach(l=>{const k=[l.date,l.desc,l.amount,l.kind].join('|');const g=m.get(k);if(g)g.n++;else m.set(k,{...l,n:1,k,dk:[l.date,l.desc,l.amount].join('|')})});return [...m.values()]}
+function reconOpen(cardId){document.getElementById('reconFile').value='';document.getElementById('reconBody').innerHTML='<div class="muted">Choose a statement PDF. It’s read on this device only — nothing is uploaded.</div>';_recon=null;
+  const sel=document.getElementById('reconCard');sel.innerHTML=state.cards.filter(c=>c.cardType!=='DEBIT'&&(c.active!==false||c.id===cardId)).map(c=>`<option value="${c.id}">${esc(bankName(c.bankId))} · ${esc(c.name)}${c.last4?' ·'+esc(c.last4):''}</option>`).join('');if(cardId)sel.value=cardId;reconRefreshPwBtn();reconDialog.showModal()}
+async function reconFilePicked(){const f=document.getElementById('reconFile').files[0];if(!f)return;const body=document.getElementById('reconBody');body.innerHTML='<div class="muted">Reading statement…</div>';
+  try{const doc=await pdfOpen(await f.arrayBuffer(),document.getElementById('reconCard').value),rows=await pdfToRows(doc),lines=rows.map(r=>r.text),sum=stmtSummary(rows);
+    let items=parseStmtLines(lines);if(!items.length)throw new Error('No transactions could be read from this PDF. It may be a scanned image, or a layout I haven’t seen yet.');
+    const period0=stmtPeriod(lines,items,sum);items=resolveYears(items,period0,sum);const period=period0&&!period0.guess?period0:stmtPeriod(lines,items,sum);
+    const g=guessCardFromText(lines),sel=document.getElementById('reconCard');if(g&&g.id!==sel.value){sel.value=g.id;toast('Card detected from the statement: '+bankName(g.bankId)+' · '+g.name)}
+    _recon={items,period,summary:sum,ovr:{}};reconRun()}catch(e){body.innerHTML=`<div class="panel empty">${esc(e.message)}</div>`}}
+function reconKindOptions(l){const o=l.credit?[['PAYMENT','Payment'],['REFUND','Refund'],['CREDIT','Other credit (ignore)']]:[['PURCHASE','Purchase'],['CHARGE','Fee / charge']];return o.map(([v,t])=>`<option value="${v}"${l.kind===v?' selected':''}>${t}</option>`).join('')}
+function reconSetKind(i,v){const g=_recon.gm[i];if(!g)return;_recon.ovr[g.dk]=v;reconRun()}
+function reconRun(){if(!_recon)return;const card=cardById(document.getElementById('reconCard').value);if(!card)return;
+  const items=_recon.items.map(i=>({...i,kind:_recon.ovr[[i.date,i.desc,i.amount].join('|')]||i.kind}));
+  const R=_recon.res=reconcile(items,card,_recon.period),P=_recon.period,S=_recon.summary||{},body=document.getElementById('reconBody'),gm=groupMissing(R.missing);_recon.gm=gm;const nTx=items.length;
+  const diff=R.stmtDebits-R.mineDebits,ok=Math.abs(diff)<1;
+  const row=(l,extra)=>`<div class="insrow" style="display:grid;grid-template-columns:${extra?'auto ':''}minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 0">${extra||''}<div style="min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.desc||l.merchant)}</div><div class="meta">${esc(displayDate(l.date))}${l.kind&&l.kind!=='PURCHASE'?' · '+l.kind.toLowerCase():''}${l.n>1?' · <b>×'+l.n+'</b> (₹'+(l.amount*l.n).toLocaleString('en-IN')+' total)':''}</div></div><strong style="${l.credit?'color:var(--good)':''}">${l.credit?'−':''}${money(l.amount)}</strong></div>`;
+  const missRows=gm.map((l,i)=>{const dis=l.kind==='REFUND'&&!reconFindOrig(card,l)&&!gm.some(x=>x.kind==='PURCHASE'&&Math.abs(x.amount-l.amount)<0.51&&x.date<=l.date);
+    return `<div style="border-bottom:1px solid var(--line)">${row(l,`<input type="checkbox" class="reconChk" data-i="${i}" ${l.kind==='CHARGE'||dis?'':'checked'} ${dis?'disabled title="Original purchase not found — add the refund from the purchase’s ⋮ menu"':''}>`)}<div style="padding:0 0 8px 30px"><select onchange="reconSetKind(${i},this.value)" style="font-size:12px;padding:2px 24px 2px 8px;height:28px;width:auto;min-width:0;max-width:200px;border-radius:8px" aria-label="Type">${reconKindOptions(l)}</select></div></div>`}).join('');
+  const dueTxt=S.totalDue!==undefined?`Total due ${S.totalDue<0?money(-S.totalDue)+' CR':money(S.totalDue)}${S.minDue!==undefined?' · min '+money(Math.abs(S.minDue)):''}${S.dueDate?' · due '+esc(displayDate(S.dueDate)):''}${S.stmtDate?' · statement '+esc(displayDate(S.stmtDate)):''}`:'';
+  const canBill=S.totalDue!==undefined&&S.stmtDate,newer=canBill&&card.billDate&&card.billDate>S.stmtDate,same=canBill&&card.billDate===S.stmtDate&&Math.abs(Number(card.currentBill||0)-Math.max(0,S.totalDue))<0.5;
+  body.innerHTML=`<div class="meta" style="margin-bottom:8px">${esc(bankName(card.bankId))} · ${esc(card.name)} · statement period ${P?esc(displayDate(P.start))+' → '+esc(displayDate(P.end)):'unknown'}${P&&P.guess?' (estimated)':''} · ${nTx} lines read</div>
+  <div class="inskpis"><div class="panel inskpi"><div class="k">Matched</div><div class="v">${R.matched.length}</div><div class="s">of ${nTx}</div></div><div class="panel inskpi"><div class="k">Missing</div><div class="v" style="color:${R.missing.length?'var(--bad)':'inherit'}">${R.missing.length}</div><div class="s">not in Cardly</div></div><div class="panel inskpi"><div class="k">Extra</div><div class="v" style="color:${R.extra.length?'var(--warn)':'inherit'}">${R.extra.length}</div><div class="s">not on statement</div></div></div>
+  <div class="panel" style="padding:10px 14px;margin-bottom:12px"><div class="meta">Purchases &amp; charges — statement ${money(R.stmtDebits)} · Cardly ${money(R.mineDebits)} · <b style="color:${ok?'var(--good)':'var(--bad)'}">${ok?'✓ totals agree':(diff>0?'statement is '+money(diff)+' higher':'Cardly is '+money(-diff)+' higher')}</b></div>
+  ${dueTxt?`<div class="meta" style="margin-top:6px">${dueTxt}</div>`:''}${canBill?`<div style="margin-top:8px">${newer?'<span class="meta">This card already has a newer bill ('+esc(displayDate(card.billDate))+').</span>':same?'<span class="meta" style="color:var(--good)">✓ Card bill already matches this statement.</span>':`<button class="btn" onclick="reconApplyBill()">Update card bill to ${money(Math.max(0,S.totalDue))} (bill date ${esc(displayDate(S.stmtDate))})</button>`}</div>`:''}</div>
+  ${gm.length?`<div class="panel" style="padding:12px 14px;margin-bottom:12px"><h3 style="margin:0 0 4px;font-size:15px">On the statement, missing in Cardly (${R.missing.length})</h3><div class="meta">Change a line’s type if it was guessed wrong.</div>${missRows}<div style="margin-top:10px"><button class="btn primary" onclick="reconAddSelected()">Add selected</button></div></div>`:''}
+  ${R.pairs.length?`<div class="panel" style="padding:12px 14px;margin-bottom:12px"><h3 style="margin:0 0 4px;font-size:15px">Same transaction, different amount or date (${R.pairs.length})</h3><div class="meta">Cardly entry → what the statement shows.</div>${R.pairs.map((p,i)=>`<div class="insrow" style="grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:6px 0"><div style="min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.t.merchant)}</div><div class="meta">${esc(displayDate(p.t.date))} · ${money(p.t.amount)} → <b>${esc(displayDate(p.l.date))} · ${money(p.l.amount)}</b></div></div><button class="btn" onclick="reconFix(${i})">Use statement</button></div>`).join('')}</div>`:''}
+  ${R.extra.length?`<div class="panel" style="padding:12px 14px;margin-bottom:12px"><h3 style="margin:0 0 4px;font-size:15px">In Cardly, not on the statement (${R.extra.length})</h3><div class="meta">Check the date or amount — or it may belong to another cycle.</div>${R.extra.map(t=>row({desc:t.merchant,date:t.date,amount:Number(t.amount),kind:t.type,credit:t.type!=='PURCHASE'},`<button class="iconbtn" title="Edit" onclick="reconDialog.close();${t.type==='REFUND'?`openEditRefund('${t.id}')`:`openEditTxn('${t.id}')`}">✎</button>`)).join('')}</div>`:''}
+  ${R.matched.length?`<details class="panel" style="padding:12px 14px;margin-bottom:12px"><summary style="cursor:pointer;font-weight:700">Matched (${R.matched.length})</summary>${R.matched.map(m=>row(m.l)).join('')}</details>`:''}
+  ${R.other.length?`<details class="panel" style="padding:12px 14px"><summary style="cursor:pointer;font-weight:700">Other credits (cashback etc., not tracked) (${R.other.length})</summary>${R.other.map(l=>row(l)).join('')}</details>`:''}`}
+async function reconApplyBill(){const card=cardById(document.getElementById('reconCard').value),S=_recon&&_recon.summary;if(!card||!S||S.totalDue===undefined||!S.stmtDate)return;
+  if(!confirm(`Set ${card.name}'s current bill to ${money(Math.max(0,S.totalDue))} with bill date ${displayDate(S.stmtDate)}?\n\nPayments dated on or after the bill date will count against it.`))return;
+  card.currentBill=Math.max(0,S.totalDue);card.billDate=S.stmtDate;card.billNotDue=S.totalDue<=0;try{await put('cards',card);await load();toast('✓ Card bill updated from statement');reconRun();if(cardDetailOpen()&&detailDialog.dataset.cardId)openCard(detailDialog.dataset.cardId)}catch(e){toast('Could not update: '+e.message)}}
+async function reconFix(i){const p=_recon&&_recon.res&&_recon.res.pairs[i];if(!p)return;p.t.amount=p.l.amount;p.t.date=p.l.date;try{await put('transactions',p.t);await load();toast('✓ Updated to the statement values');reconRun()}catch(e){toast('Could not update: '+e.message)}}
+function reconFindOrig(card,l){const cand=state.transactions.filter(t=>t.cardId===card.id&&t.type==='PURCHASE'&&t.status!=='REFUNDED'&&t.date<=l.date&&Math.abs(Number(t.amount)-l.amount)<0.51&&refundCap(t)>=l.amount-0.51);cand.sort((a,b)=>mSim(l.desc,b.merchant)-mSim(l.desc,a.merchant)||b.date.localeCompare(a.date));return cand[0]||null}
+async function reconAddSelected(){const card=cardById(document.getElementById('reconCard').value);if(!card||!_recon)return;const picks=[...document.querySelectorAll('.reconChk:checked')].map(c=>_recon.gm[Number(c.dataset.i)]).filter(Boolean);if(!picks.length){toast('Nothing selected.');return}
+  let n=0;picks.sort((a,b)=>(a.kind==='REFUND')-(b.kind==='REFUND'));try{for(const g of picks)for(let i=0;i<g.n;i++){
+      if(g.kind==='PAYMENT')await put('transactions',{id:id(),cardId:card.id,date:g.date,merchant:'Bill Payment',amount:g.amount,type:'PAYMENT',status:'COMPLETED',refundDate:''});
+      else if(g.kind==='REFUND'){const o=reconFindOrig(card,g);if(!o)continue;await put('transactions',{id:id(),cardId:card.id,date:g.date,merchant:o.merchant,amount:g.amount,type:'REFUND',status:'COMPLETED',refundOf:o.id,refundDate:''})}
+      else await put('transactions',{id:id(),cardId:card.id,date:g.date,merchant:niceMerchant(g.desc),amount:g.amount,type:'PURCHASE',status:'COMPLETED',refundDate:''});n++}
+    await load();toast(`✓ Added ${n} transaction${n===1?'':'s'}`);reconRun();if(cardDetailOpen()&&detailDialog.dataset.cardId)openCard(detailDialog.dataset.cardId)}catch(e){toast('Could not add: '+e.message)}}
+document.getElementById('reconCard').onchange=()=>{if(_recon)reconRun()};
+document.getElementById('reconFile').onchange=()=>reconFilePicked();{const dz=document.getElementById('reconDrop');['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor='var(--accent)'}));['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor=''}));dz.addEventListener('drop',ev=>{const f=ev.dataTransfer&&ev.dataTransfer.files[0];if(f&&/\.pdf$/i.test(f.name))reconFilePicked(f);else toast('Please drop a PDF.')})}document.getElementById('reconCard').onchange=()=>{if(_recon)reconRun()};
 document.getElementById('backupConnectBtn').onclick=connectBackup;document.getElementById('backupNowBtn').onclick=()=>backupNow(true);document.getElementById('backupRestoreBtn').onclick=()=>restoreFromDrive(false);document.getElementById('backupDisconnectBtn').onclick=disconnectBackup;document.getElementById('driveRestoreGate').onclick=()=>restoreFromDrive(true);
 document.getElementById('backupAutoChk').onchange=e=>{setBMeta({auto:e.target.checked});if(e.target.checked&&bMeta().dirty)backupSchedule();backupRefreshUI()};
 const NOTIFY_KEY='cardly-notify-enabled', NOTIFY_SEEN_KEY='cardly-notify-seen';
@@ -1108,7 +1267,7 @@ function openCard(cardId){
     <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Milestones</div><button class="btn" onclick="openNewMilestone('${c.id}')">+ Add Milestone</button></div>
       ${ms.length?ms.map(m=>{const v=isWindows(m)?(windowInfo(m,c)||{v:0}).v:spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone panel cardrow"><div class="milestonehead"><strong>${esc(m.name)}</strong><div class="milestone-actions"><span>${Math.round(p)}%</span><button class="btn milestone-edit-btn" onclick="openMilestone('${m.id}')">Edit</button></div></div><div class="meta">${esc(milestonePeriodLabel(m.periodType,m))}</div><div class="bar"><div class="fill" style="width:${p}%"></div></div><div class="meta">${money(v)} / ${money(m.targetAmount)} · ${money(Math.max(0,Number(m.targetAmount)-v))} remaining</div>${note?`<div class="meta" style="margin-top:4px">${note}</div>`:''}</div>`}).join(''):'<div class="panel empty">No milestones configured.</div>'}
     </div>
-    <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><button class="btn" onclick="nestedFromDetail();openTxnFor('${c.id}')">+ Add</button></div>
+    <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><div style="display:flex;gap:8px"><button class="btn" onclick="nestedFromDetail();reconOpen('${c.id}')">Reconcile</button><button class="btn" onclick="nestedFromDetail();openTxnFor('${c.id}')">+ Add</button></div></div>
       ${txnGroupsDetail(ts,cardId)}
     </div>`;
   showCardDetail();
