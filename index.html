@@ -55,7 +55,7 @@ select{appearance:none;-webkit-appearance:none;background-image:url("data:image/
 .attgroup .sectionhead{padding-bottom:8px;border-bottom:1px solid var(--line)}
 #homeAttention>.sectionhead .sectiontitle{font-size:20px}
 .homebar[hidden]{display:none}.homebar{display:flex;gap:8px;overflow-x:auto;margin:0 0 14px;scrollbar-width:none}.homebar::-webkit-scrollbar{display:none}.homebar .filterchip{flex:none}
-@media(min-width:900px){#tab-home[data-layout=alerts] #homePrimary,#tab-home[data-layout=slim] #homePrimary{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}}
+@media(min-width:900px){#tab-home[data-layout=none] #homePrimary,#tab-home[data-layout=slim] #homePrimary{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}}
 .attgroup.collapsible>.sectionhead{cursor:pointer;user-select:none}.attgroup.collapsible>.sectionhead::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s}.attgroup.collapsible.isclosed>.sectionhead::after{transform:rotate(-90deg)}.attgroup.isclosed>.attrows{display:none}.attgroup.isclosed{margin-bottom:12px}
 .filterchip{background:var(--panel);font-weight:600;padding:7px 14px}.filterchip.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px;margin:12px 0}.chips::-webkit-scrollbar{display:none}.filterchip{flex:none}
@@ -95,6 +95,13 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 .panel.stacked.s3{margin-bottom:24px;box-shadow:0 8px 0 -3px var(--soft),0 9px 0 -2px var(--sb),0 16px 0 -7px var(--soft),0 17px 0 -6px var(--sb)}
 .stacked .badge,.stackedrow .badge{background:var(--accent);color:#fff;font-weight:700}
 .panel.dtl{overflow:hidden}.panel.dtl .row{border-bottom:0}.panel.dtl:hover{background:color-mix(in srgb,var(--accent) 9%,var(--panel))}
+
+.band{display:flex;align-items:center;gap:10px;margin:28px 0 12px;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}.band::after{content:"";flex:1;height:1px;background:var(--line)}.band .bandn{background:var(--bad);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;letter-spacing:0}.band:first-child{margin-top:8px}
+.attgroup{margin-bottom:18px}.attgroup .sectiontitle::before{display:none}.attgroup .sectiontitle{font-size:16px}.attgroup .sectionhead{border:0;padding-bottom:6px}.sec-ic{font-size:16px}.seccount{font-size:12px;font-weight:700;background:var(--soft,rgba(128,128,128,.15));border-radius:999px;padding:1px 8px;color:var(--muted)}
+.attgroup>.panel.attrows{border-left:4px solid var(--line)}.tone-bad>.panel.attrows{border-left-color:var(--bad)}.tone-warn>.panel.attrows{border-left-color:var(--warn,#e08a00)}.tone-acc>.panel.attrows{border-left-color:var(--accent)}
+details.attgroup>summary.sectionhead{cursor:pointer;list-style:none;display:flex}details.attgroup>summary::-webkit-details-marker{display:none}details.attgroup>summary::after{content:"▾";margin-left:auto;color:var(--muted);font-size:18px}details.attgroup[open]>summary::after{transform:rotate(180deg)}
+.allclear{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--good);font-weight:700;margin-bottom:6px}
+.soonrow .when{flex:none;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--soft,rgba(128,128,128,.15))}.soonrow .when.hot{background:var(--warn,#e08a00);color:#fff}
 </style>
 </head>
 <body>
@@ -103,7 +110,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 <div class="shell">
   <header class="top">
     <div class="brand"><svg width="24" height="24" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="100" height="100" rx="24" fill="#ff7800"/><rect x="20" y="32" width="60" height="40" rx="7" fill="#fffaf4"/><rect x="20" y="32" width="60" height="13" fill="#21180f"/><rect x="27" y="56" width="20" height="8" rx="2" fill="#ff7800"/></svg>CARDLY</div>
-    <div class="top-actions"><button class="iconbtn" id="settingsBtn" title="Settings" hidden>⚙</button><button class="iconbtn" id="notifyToggle" title="Turn on due-date alerts">🔕</button><button class="iconbtn" id="theme">◐</button></div>
+    <div class="top-actions"><button class="iconbtn" id="settingsBtn" title="Settings" hidden>⚙</button><button class="iconbtn" id="icsBtn" title="Add due dates & statement dates to your calendar (with alerts)" onclick="exportIcs()">📅</button><button class="iconbtn" id="notifyToggle" title="Turn on due-date alerts">🔕</button><button class="iconbtn" id="theme">◐</button></div>
   </header>
   <main id="dataGate" class="panel data-gate">
     <h1 id="dataGateTitle">Open your Cardly data</h1>
@@ -125,19 +132,17 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 
     <div class="tabpane" id="tab-home">
       <div class="stats">
-        <div class="stat"><strong id="cardCount">0</strong><span>Active cards</span></div>
+        <div class="stat"><strong id="dueTotal">₹0</strong><span>To pay</span></div>
         <div class="stat"><strong id="unpaidCount">0</strong><span>Unpaid bills</span></div>
-        <div class="stat"><strong id="dueTotal">₹0</strong><span>Current dues</span></div>
+        <div class="stat"><strong id="nextDue">—</strong><span id="nextDueSub">Next due</span></div>
       </div>
-      <div id="homeLayoutBar" class="homebar" hidden></div>
       <div id="homeAttention"></div>
-      <div id="homePrimary"><div id="msWrap">
+      <div id="homePrimary"><div id="msWrap"><div class="band" id="msBand">Progress</div>
       <div class="mstools"><div class="insseg" id="msTypeSeg" style="margin:0"><button data-v="all">All</button><button data-v="other">Spend &amp; other</button><button data-v="waiver">Fee waiver</button></div>
       <div class="msbar"><label class="msfield"><span>Sort</span><select id="msSort"><option value="pace">Most behind pace</option><option value="ending">Ending soonest</option><option value="achieved">Achieved first</option></select></label><label class="msfield"><span>Show</span><select id="msCount"><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="all">All</option></select></label></div></div>
-      <div id="msSection"></div></div>
-      <div id="billSection"></div></div>
+      <div id="msSection"></div></div></div>
+      <div id="billSection"></div>
       <div id="utilSection"></div>
-      <div id="renewalSection"></div>
     </div>
 
     <div class="tabpane" id="tab-cards" hidden>
@@ -159,6 +164,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
       <div class="sectionhead"><div><div class="sectiontitle">Insights</div><div class="muted" id="insSub"></div></div></div>
       <div class="chips" id="insRange"></div>
       <div id="insBody"></div>
+      <div id="insCycles"></div>
     </div>
 
     <div class="tabpane" id="tab-ais" hidden>
@@ -173,11 +179,7 @@ dialog input:not([type=checkbox]):not([type=radio]),dialog select{height:44px;bo
 
   <main id="settingsPage" hidden>
     <div class="hero"><div><div class="eyebrow">Configuration</div><div class="title">Settings</div><div class="sub">Applies across all your cards.</div></div><div class="hero-actions"><button class="btn" id="settingsBack">← Back</button></div></div>
-    <section class="section">
-      <div class="sectionhead"><div><div class="sectiontitle">Home layout</div><div class="muted">Bills and Milestones always stay front and centre.</div></div></div>
-      <div class="panel" style="padding:14px"><select id="homeLayoutSelect"><option value="alerts">Two columns + Alerts chips</option><option value="tabs">Segmented tabs</option><option value="collapse">Collapsible sections</option><option value="slim">Slim home (extras on Cards tab)</option><option value="classic">Classic (everything)</option></select></div>
-    </section>
-    <section class="section">
+        <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Card details view</div><div class="muted">How a card opens when you tap it.</div></div></div>
       <div class="panel" style="padding:14px"><select id="cardViewSelect"><option value="page">Full page</option><option value="dialog">Pop-up dialog</option></select></div>
     </section>
@@ -363,7 +365,15 @@ function periodRange(type,c,ms_){if(type==='CUSTOM')return [ms_&&ms_.startDate||
 function spend(cardId,type,mm){const c=state.cards.find(x=>x.id===cardId);if(!mm){let ms=state.milestones.filter(x=>x.cardId===cardId&&x.periodType===type);if(!ms.length)return 0}let [s,e]=periodRange(type,c,mm);if(!s)return 0;return state.transactions.filter(t=>t.cardId===cardId&&t.type!=='PAYMENT'&&t.type!=='REFUND'&&t.date>=s&&t.date<=e).reduce((a,t)=>a+netAmount(t),0)}
 function isFeeWaiver(m){if(m&&m.purpose)return m.purpose==='WAIVER';return !!m&&(m.autoFeeWaiver||/fee\s*waiver/i.test(m.name||''))}
 function milestonePeriodLabel(type,m){if(type==='SPECIFIC_DAYS')return 'Every month · '+((m&&m.days)||[]).map(daysLabel).join(' & ')+(m&&m.reward?' · '+m.reward:'');if(type==='CUSTOM')return m&&m.startDate?`Custom · ${displayDate(m.startDate)} → ${displayDate(m.endDate)}`:'Custom';if(type==='FINANCIAL_YEAR')return 'Financial year · '+fyRange().label;return type==='MEMBERSHIP_YEAR'?(isFeeWaiver(m)?'Fee waiver · membership year':'Membership year'):type.replaceAll('_',' ')}
-function milestoneNote(c,m,v){if(isWindows(m)){const i=windowInfo(m,c);if(!i)return '';const need=Number(m.targetAmount);return `Next: ${esc(displayDate(i.focus))}${i.focus===today()?' (today)':''} — ${i.v>=need?'✓ done':money(Math.max(0,need-i.v))+' to go'}<br>This month: ${windowChips(i)}`}const[,e]=periodRange(m.periodType,c,m);if(!e)return '';const target=Number(m.targetAmount);if(m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m))return v>=target?`🎉 Fee waived for the ${esc(displayDate(nextRenewalDate(c)))} renewal`:`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))} to waive next year's fee`;return v>=target?'✓ Target reached':`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))}`}
+function msForecast(c,m,v){const target=Number(m.targetAmount)||0;if(!(target>0)||v>=target||isWindows(m))return '';const[s0,e]=periodRange(m.periodType,c,m);if(!e)return '';const t0=today();
+  if(s0&&s0>t0)return `<span style="color:var(--muted)">Forecast: starts ${esc(displayDate(s0))}</span>`;
+  const left=Math.max(0,daysUntil(e)),elapsed=s0?Math.max(1,-daysUntil(s0)+1):30,rate=v/elapsed,need=target-v,req=need/Math.max(1,left),proj=v+rate*left;
+  if(left===0)return `<span style="color:var(--bad)">Forecast: last day — ${money(need)} needed today</span>`;
+  if(v<=0||elapsed<4)return `<span style="color:var(--muted)">Forecast: too early to tell · needs ${money(req)}/day</span>`;
+  if(proj>=target){const d=Math.max(0,Math.ceil(need/rate));return `<span style="color:var(--good)">▲ On track · likely by ${esc(displayDate(addDays(t0,d)))} · projected ${money(proj)}</span>`}
+  return `<span style="color:var(--bad)">▼ Behind pace · projected ${money(proj)} of ${money(target)} · needs ${money(req)}/day (now ${money(rate)}/day)</span>`}
+function milestoneNote(c,m,v){const n=milestoneNote0(c,m,v),f=msForecast(c,m,v);return n+(f?(n?'<br>':'')+f:'')}
+function milestoneNote0(c,m,v){if(isWindows(m)){const i=windowInfo(m,c);if(!i)return '';const need=Number(m.targetAmount);return `Next: ${esc(displayDate(i.focus))}${i.focus===today()?' (today)':''} — ${i.v>=need?'✓ done':money(Math.max(0,need-i.v))+' to go'}<br>This month: ${windowChips(i)}`}const[,e]=periodRange(m.periodType,c,m);if(!e)return '';const target=Number(m.targetAmount);if(m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m))return v>=target?`🎉 Fee waived for the ${esc(displayDate(nextRenewalDate(c)))} renewal`:`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))} to waive next year's fee`;return v>=target?'✓ Target reached':`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))}`}
 /* Some banks reduce the current bill when a refund lands after the statement was generated (for a purchase that was on that statement).
    That credit lowers what is owed but is NOT a payment, so AIS totals are untouched. Opt-in per card: c.refundsReduceBill */
 function refundQualifies(c,date,o){return !!(c&&c.billDate&&o&&date>=c.billDate&&o.date<c.billDate&&c.cardType!=='DEBIT')}
@@ -407,7 +417,9 @@ function setTab(t){
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{setTab(b.dataset.tab);window.scrollTo(0,0)});
 function dueLabel(d){return d<0?`Overdue by ${-d} day${-d===1?'':'s'}`:d===0?'Due today':`Due in ${d} day${d===1?'':'s'}`}
 function attRow(inner,btn,cls='',openId=''){return `<div class="attrow${cls?' '+cls:''}"><div class="attmain${openId?' clickable':''}"${openId?` onclick="openCard('${openId}')"`:''}>${inner}</div>${btn}</div>`}
-function attSection(title,sub,rows){return `<div class="attgroup"><div class="sectionhead"><div><div class="sectiontitle">${title} <span class="muted">· ${rows.length}</span></div><div class="muted">${sub}</div></div></div><div class="panel attrows">${rows.join('')}</div></div>`}
+const ATT_STYLE={'Unpaid bills':['💳','bad'],'Bill details needed':['🧾','warn'],'Milestones ending soon':['⏳','warn'],'Annual fee renewals coming up':['🔁','warn'],'AIS reporting limit':['⚠️','bad'],'Coming up':['📅','n'],'Milestones':['🎯','acc'],'Limit utilisation':['📊','n']};
+function attSection(title,sub,rows,o={}){const [ic,tone]=ATT_STYLE[title]||['','n'],head=`<div class="sectionhead"><div><div class="sectiontitle"><span class="sec-ic">${ic}</span>${title} <span class="seccount">${rows.length}</span></div><div class="muted">${sub}</div></div></div>`,body=`<div class="panel attrows">${rows.join('')}</div>`;
+  return o.collapsed?`<details class="attgroup tone-${tone}"><summary class="sectionhead">${head.replace(/^<div class="sectionhead">|<\/div>$/g,'')}</summary>${body}</details>`:`<div class="attgroup tone-${tone}">${head}${body}</div>`}
 function allMilestones(){
   const out=[];
   state.milestones.forEach(m=>{
@@ -434,7 +446,7 @@ function milestoneCount(){const v=localStorage.getItem('cardly-ms-count');return
 function renderHome(){
   msSort.value=milestoneSort();msCount.value=milestoneCount();document.querySelectorAll('#msTypeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===milestoneType()));
   const active=state.cards.filter(c=>c.active!==false),unpaidAll=state.cards.filter(c=>c.cardType!=='DEBIT'&&status(c)!=='paid');
-  document.getElementById('cardCount').textContent=active.length;
+  
   document.getElementById('unpaidCount').textContent=unpaidAll.length;
   document.getElementById('dueTotal').textContent=money(unpaidAll.reduce((a,c)=>a+outstanding(c),0));
   const unpaid=state.cards.filter(c=>c.cardType!=='DEBIT'&&(c.active!==false||outstanding(c)>0)&&status(c)!=='paid').map(c=>({c,d:daysUntil(dueDate(c))})).sort((a,b)=>(a.d===null?9999:a.d)-(b.d===null?9999:b.d));
@@ -444,6 +456,7 @@ function renderHome(){
   const msUrgent=allMilestones().filter(x=>!x.achieved&&x.left<=milestoneSoonDays()).sort(MS_SORTS.pace);
   const fees=active.filter(feeDueSoon).map(c=>({c,rd:nextRenewalDate(c)})).sort((a,b)=>a.rd.localeCompare(b.rd));
   const ais=aisSummary().filter(g=>g.level==='crossed');
+  {const nd=unpaid.filter(x=>x.d!==null)[0];document.getElementById('nextDue').textContent=nd?(nd.d<0?`${-nd.d}d late`:nd.d===0?'Today':`in ${nd.d}d`):'—';document.getElementById('nextDueSub').textContent=nd?`${nd.c.name}`:'Nothing due'}
   let out='';
   if(unpaid.length)out+=attSection('Unpaid bills','Overdue first, then by due date.',unpaid.map(({c,d})=>{const late=d!==null&&d<0,soon=d!==null&&d<=DUE_REMINDER_DAYS;return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta"${late?' style="color:var(--bad)"':''}>${d===null?'Due date unknown':`${dueLabel(d)} · ${esc(displayDate(dueDate(c)))}`} · Outstanding ${money(outstanding(c))}</div>`,`<div class="attbtns"><button class="btn" onclick="openPayment('${c.id}')">+ Add Payment</button><button class="btn${soon?' primary':''}" onclick="openPayment('${c.id}',true)">Mark Bill Paid</button></div>`,'',c.id)}));
   if(msUrgent.length)out+=attSection('Milestones ending soon',`Incomplete, with ${milestoneSoonDays()} day${milestoneSoonDays()===1?'':'s'} or less left.`,msUrgent.map(({m,c,v,target,left,end})=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)} — ${esc(m.name)}</span></div><div class="meta">${money(v)} of ${money(target)} · ${money(target-v)} to go · ${left===0?'ends today':`${left} day${left===1?'':'s'} left`} (${esc(displayDate(end))})</div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)));
@@ -451,15 +464,16 @@ function renderHome(){
   const lookahead=renewalListDays(),upcoming=state.cards.filter(c=>c.active!==false&&!c.lifetimeFree&&c.renewalDate).map(c=>({c,rd:nextRenewalDate(c)})).map(x=>({...x,d:daysUntil(x.rd)})).filter(x=>x.d!==null&&x.d>=0&&x.d<=lookahead).sort((a,b)=>a.d-b.d);
   const billLook=billListDays(),upBills=active.filter(c=>c.cardType!=='DEBIT').map(c=>({c,sd:nextStatementDate(c)})).filter(x=>x.sd).map(x=>({...x,d:daysUntil(x.sd)})).filter(x=>x.d!==null&&x.d>=1&&x.d<=billLook).sort((a,b)=>a.d-b.d||bankName(a.c.bankId).localeCompare(bankName(b.c.bankId)));
   {const uc=active.filter(c=>c.cardType!=='DEBIT'&&limitUsed(c)>0).sort((a,b)=>(utilPct(b)??-1)-(utilPct(a)??-1)||limitUsed(b)-limitUsed(a));const wl=uc.filter(c=>creditLimit(c)>0),tu=wl.reduce((a,c)=>a+limitUsed(c),0),tl=wl.reduce((a,c)=>a+creditLimit(c),0);
-  document.getElementById('utilSection').innerHTML=uc.length?attSection('Limit utilisation',`Outstanding + unbilled spend per card${tl?` · Total ${money(tu)} of ${money(tl)} (${Math.round(tu/tl*100)}%)`:''}.`,uc.map(c=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(c.name)}${last4Tag(c)}</span></div>${utilBar(c)}`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`))):''}
-  document.getElementById('billSection').innerHTML=upBills.length?attSection('Upcoming bills',`New statements generating in the next ${billLook} day${billLook===1?'':'s'}.`,upBills.map(({c,sd,d})=>{const due=dueDateFor?dueDateFor(c,sd):'';return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Statement ${esc(displayDate(sd))} (in ${d} day${d===1?'':'s'})${due?` · Payment due ${esc(displayDate(due))}`:''}</div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)})):'';
-  document.getElementById('renewalSection').innerHTML=upcoming.length?attSection('Upcoming renewals',`Annual fees renewing in the next ${lookahead} day${lookahead===1?'':'s'}.`,upcoming.map(({c,rd,d})=>{const wm=state.milestones.find(m=>m.cardId===c.id&&m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m)&&m.active!==false);let waiver='';if(wm){const v=spend(c.id,'MEMBERSHIP_YEAR'),t=Number(wm.targetAmount);waiver=v>=t?' · fee waiver achieved ✓':` · ${money(Math.max(0,t-v))} more to waive`}return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Renews ${esc(displayDate(rd))} (${d===0?'today':`in ${d} day${d===1?'':'s'}`}) · Fee ${money(c.annualFee)}${waiver}</div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)})):'';
-  document.getElementById('msSection').innerHTML=msAll.length?attSection('Milestones',`Showing ${ms.length} of ${msAll.length}.`,ms.map(({m,c,v,target,left,end,achieved,win})=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${achieved?'✓ ':''}${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)} — ${esc(m.name)}</span></div><div class="meta">${money(v)} of ${money(target)}${achieved?' · achieved':` · ${money(target-v)} to go`} · ${win?(left===0?'· today':`· on ${esc(displayDate(end))} (in ${left} day${left===1?'':'s'})`):(left===0?'ends today':`${left} day${left===1?'':'s'} left`)+` (${esc(displayDate(end))})`}${m.reward?` · 🎁 ${esc(m.reward)}`:''}${win?`<br>${windowChips(win)}`:''}${m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m)&&Number(c.annualFee)>0?` · waives ${money(c.annualFee)} fee`:''}</div><div class="bar" style="margin-top:8px"><div class="fill" style="width:${Math.min(100,v/target*100)}%"></div></div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`,achieved?'achieved':''))):'<div class="panel empty">'+(milestoneType()==='all'?'No milestones configured on any card yet.':milestoneType()==='other'?'No spend-bonus or other milestones yet. Add one from a card.':'No fee-waiver milestones yet.')+'</div>';
+  document.getElementById('utilSection').innerHTML=uc.length?attSection('Limit utilisation',`Outstanding + unbilled spend per card${tl?` · Total ${money(tu)} of ${money(tl)} (${Math.round(tu/tl*100)}%)`:''}.`,uc.map(c=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(c.name)}${last4Tag(c)}</span></div>${utilBar(c)}`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`)),{collapsed:true}):''}
+  {const evs=[];upBills.forEach(({c,sd,d})=>{const due=dueDateFor(c,sd);evs.push({d,c,t:`🧾 Statement generates ${displayDate(sd)}${due?` · payment due ${displayDate(due)}`:''}`})});
+  upcoming.filter(x=>!fees.some(f=>f.c.id===x.c.id)).forEach(({c,rd,d})=>{const wm=state.milestones.find(m=>m.cardId===c.id&&m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m)&&m.active!==false);let waiver='';if(wm){const v=spend(c.id,'MEMBERSHIP_YEAR'),t=Number(wm.targetAmount);waiver=v>=t?' · waiver achieved ✓':` · ${money(Math.max(0,t-v))} more to waive`}evs.push({d,c,t:`🔁 Annual fee ${money(c.annualFee)} renews ${displayDate(rd)}${waiver}`})});
+  evs.sort((a,b)=>a.d-b.d);const win=Math.max(billLook,lookahead);
+  document.getElementById('billSection').innerHTML=evs.length?`<div class="band">Coming up</div>`+attSection('Coming up',`Statements and fee renewals in the next ${win} days.`,evs.map(({d,c,t})=>`<div class="attrow soonrow"><div class="attmain clickable" onclick="openCard('${c.id}')"><div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">${t}</div></div><span class="when${d<=3?' hot':''}">${d===0?'today':`in ${d}d`}</span></div>`)):''}
+  document.getElementById('msSection').innerHTML=msAll.length?attSection('Milestones',`Showing ${ms.length} of ${msAll.length}.`,ms.map(({m,c,v,target,left,end,achieved,win})=>attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${achieved?'✓ ':''}${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)} — ${esc(m.name)}</span></div><div class="meta">${money(v)} of ${money(target)}${achieved?' · achieved':` · ${money(target-v)} to go`} · ${win?(left===0?'· today':`· on ${esc(displayDate(end))} (in ${left} day${left===1?'':'s'})`):(left===0?'ends today':`${left} day${left===1?'':'s'} left`)+` (${esc(displayDate(end))})`}${m.reward?` · 🎁 ${esc(m.reward)}`:''}${win?`<br>${windowChips(win)}`:(achieved?'':(()=>{const f=msForecast(c,m,v);return f?'<br>'+f:''})())}${m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m)&&Number(c.annualFee)>0?` · waives ${money(c.annualFee)} fee`:''}</div><div class="bar" style="margin-top:8px"><div class="fill" style="width:${Math.min(100,v/target*100)}%"></div></div>`,`<button class="btn" onclick="openCard('${c.id}')">View</button>`,achieved?'achieved':''))):'<div class="panel empty">'+(milestoneType()==='all'?'No milestones configured on any card yet.':milestoneType()==='other'?'No spend-bonus or other milestones yet. Add one from a card.':'No fee-waiver milestones yet.')+'</div>';
   if(fees.length)out+=attSection('Annual fee renewals coming up','Decide whether to keep the card before the fee posts.',fees.map(({c,rd})=>{const d=daysUntil(rd);return attRow(`<div class="cardname bnrow">${bankTag(c.bankId)}<span>${esc(bankName(c.bankId))} · ${esc(c.name)}${last4Tag(c)}</span></div><div class="meta">Renews ${esc(displayDate(rd))} (in ${d} day${d===1?'':'s'}) · Fee ${money(c.annualFee)}</div>`,`<button class="btn" onclick="openCard('${c.id}')">Review</button>`)}));
-  if(ais.length)out+=attSection('AIS reporting limit','Bill payments per bank this financial year.',ais.map(g=>attRow(`<div class="cardname bnrow">${bankTag(g.bankId)}<span>${esc(g.bankName)} · limit reached</span></div><div class="meta">${esc(aisMessage(g))}</div>`,`<button class="btn" onclick="setTab('ais')">View</button>`)));
-  const count=unpaid.length+billUpdates.length+msUrgent.length+fees.length+ais.length,badge=document.getElementById('homeBadge');
+  const count=unpaid.length+billUpdates.length+msUrgent.length+fees.length,badge=document.getElementById('homeBadge');
   badge.hidden=!count;badge.textContent=count;
-  document.getElementById('homeAttention').innerHTML=out?`<div class="sectionhead"><div class="sectiontitle">Needs attention</div></div>${out}`:'<div class="panel empty">All clear — nothing needs your attention right now.</div>';
+  document.getElementById('homeAttention').innerHTML=out?`<div class="band">Needs action <span class="bandn">${count}</span></div>${out}`:`<div class="allclear">✓ All clear — nothing needs your action right now.</div>`;
 }
 function cardRowHtml(c){
   const isDebit=c.cardType==='DEBIT';
@@ -576,6 +590,25 @@ let insRange='fy',insBy='card',insSel=null,insMetric='spend';
 function setInsMetric(m){insMetric=m;insSel=null;renderInsights()}
 function setInsRange(r){insRange=r;insSel=null;renderInsights()}function setInsBy(b){insBy=b;renderInsights()}function setInsSel(k){insSel=k;renderInsights()}
 function insMonths(){const t=today(),y=Number(t.slice(0,4)),m=Number(t.slice(5,7));let n,sy,sm;if(insRange==='fy'){sy=m>=4?y:y-1;sm=4;n=(y-sy)*12+m-4+1}else{n=Number(insRange);let idx=y*12+m-1-(n-1);sy=Math.floor(idx/12);sm=idx%12+1}const out=[];for(let k=0;k<n;k++){const idx=sy*12+sm-1+k,yy=Math.floor(idx/12),mm=idx%12+1;out.push(`${yy}-${String(mm).padStart(2,'0')}`)}return out}
+
+/* ===== Spend by statement cycle (Insights) ===== */
+let insCycleCard=null;
+function cycleList(c,n){const day=Number(c.statementDay);if(!(day>=1&&day<=31))return [];const s0=latestStatementDate(c);if(!s0)return [];const y=Number(s0.slice(0,4)),m=Number(s0.slice(5,7))-1,out=[];
+  for(let k=0;k<n;k++){const start=dateForMonth(y,m-k,day),end=addDays(dateForMonth(y,m-k+1,day),-1);out.push({start,end,cur:k===0})}return out}
+function cycleStats(c,cy){const tx=state.transactions.filter(t=>t.cardId===c.id&&t.date>=cy.start&&t.date<=cy.end);let spend=0,n=0,rw=0,paid=0;tx.forEach(t=>{if(t.type==='PURCHASE'&&t.status!=='REFUNDED'){spend+=netAmount(t);n++;rw+=rewardFor(t,c)}else if(t.type==='PAYMENT')paid+=Number(t.amount)||0});return{spend,n,rw,paid}}
+function setInsCycleCard(id){insCycleCard=id;renderCycles()}
+function cycleOpen(cardId,a,b){try{localStorage.setItem('cardly-txn-card',cardId)}catch(e){}document.getElementById('txnFrom').value=a;document.getElementById('txnTo').value=b;document.getElementById('txnSearch').value='';setTab('transactions');renderTransactions();window.scrollTo(0,0)}
+function cardCyclesPanel(c){if(c.cardType==='DEBIT'||!(Number(c.statementDay)>=1))return '';const list=cycleList(c,4).map(cy=>({...cy,...cycleStats(c,cy)}));if(!list.length||!list.some(x=>x.n>0))return '';const max=Math.max(1,...list.map(x=>x.spend)),cur=list[0],dl=daysUntil(addDays(cur.end,1));
+  return `<div class="detail-section panel cardrow"><div class="sectionhead" style="margin-bottom:6px"><div><div class="sectiontitle">Spend by statement cycle</div><div class="meta">Current: ${money(cur.spend)} so far · statement in ${dl} day${dl===1?'':'s'}</div></div><button class="btn" onclick="cardCyclesAll('${c.id}')">All cycles</button></div>${list.map(x=>`<div class="insrow" style="cursor:pointer" onclick="cardCycleOpen('${c.id}','${x.start}','${x.end}')"><div class="nm"><div style="font-weight:600">${esc(displayDate(x.start).slice(0,5))} → ${esc(displayDate(x.end).slice(0,5))}${x.cur?' <span class="meta" style="color:var(--accent)">· current</span>':''}</div><div class="meta">${x.n} purchase${x.n===1?'':'s'}${x.rw>0?' · '+money(x.rw)+' rewards':''}</div></div><div class="amt">${money(x.spend)}</div><div class="tr"><i style="width:${x.spend/max*100}%${x.cur?';opacity:.65':''}"></i></div></div>`).join('')}</div>`}
+function cardCycleOpen(id,a,b){closeCardDetail();cycleOpen(id,a,b)}
+function cardCyclesAll(id){closeCardDetail();insCycleCard=id;setTab('insights');renderInsights();const el=document.getElementById('insCycles');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}
+function renderCycles(){const el=document.getElementById('insCycles');if(!el)return;withHolder(()=>{
+  const cards=state.cards.filter(c=>c.cardType!=='DEBIT'&&Number(c.statementDay)>=1&&state.transactions.some(t=>t.cardId===c.id)&&(c.active!==false||cycleStats(c,cycleList(c,1)[0]||{start:'9',end:'0'}).n>0)).sort((a,b)=>bankName(a.bankId).localeCompare(bankName(b.bankId))||String(a.name).localeCompare(String(b.name)));
+  if(!cards.length){el.innerHTML='';return}
+  if(!cards.some(c=>c.id===insCycleCard))insCycleCard=cards[0].id;const c=cardById(insCycleCard),list=cycleList(c,7).map(cy=>({...cy,...cycleStats(c,cy)})),max=Math.max(1,...list.map(x=>x.spend)),done=list.filter(x=>!x.cur&&x.n>0),avg=done.length?done.reduce((a,x)=>a+x.spend,0)/done.length:0;
+  const cur=list[0],nextStmt=addDays(cur.end,1),dl=daysUntil(nextStmt),projNote=avg>0?(cur.spend>avg?` · <b style="color:var(--warn)">${money(cur.spend-avg)} above</b> your usual`:` · ${money(avg-cur.spend)} below your usual`):'';
+  const rows=list.map(x=>`<div class="insrow" style="cursor:pointer" onclick="cycleOpen('${c.id}','${x.start}','${x.end}')"><div class="nm"><div style="font-weight:600">${esc(displayDate(x.start).slice(0,5))} → ${esc(displayDate(x.end).slice(0,5))}${x.cur?` <span class="meta" style="color:var(--accent)">· current</span>`:''}</div><div class="meta">${x.n} purchase${x.n===1?'':'s'}${x.rw>0?` · ${money(x.rw)} rewards`:''}${x.paid>0?` · paid ${money(x.paid)}`:''}</div></div><div class="amt">${money(x.spend)}</div><div class="tr"><i style="width:${x.spend/max*100}%${x.cur?';opacity:.65':''}"></i></div></div>`).join('');
+  el.innerHTML=`<div class="panel inspanel"><h3>Spend by statement cycle</h3><div class="insdetail">Current cycle: ${money(cur.spend)} so far · statement in ${dl} day${dl===1?'':'s'} (${esc(displayDate(nextStmt))})${projNote}</div><div class="chips" style="margin:0 0 6px">${cards.map(k=>`<button class="filterchip${k.id===c.id?' active':''}" onclick="setInsCycleCard('${k.id}')">${bankTag(k.bankId)}${esc(k.name)}</button>`).join('')}</div>${rows}<div class="meta" style="margin-top:6px">Tap a cycle to see its transactions. A purchase on the statement date counts toward the next bill.</div></div>`})}
 function renderInsights(){
   const isR0=insMetric==='rewards',months=insMonths(),set=new Set(months),mn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const lab=k=>mn[Number(k.slice(5))-1]+" '"+k.slice(2,4);
@@ -586,7 +619,7 @@ function renderInsights(){
   const total=tx.reduce((a,t)=>a+val(t),0),max=Math.max(1,...months.map(k=>byM[k]));
   const avg=total/months.length,topM=months.reduce((b,k)=>byM[k]>byM[b]?k:b,months[0]);
   document.getElementById('insSub').textContent=tx.length?`${tx.length} purchase${tx.length===1?'':'s'}${isR0?' earning rewards':''} · net of refunds`:'';
-  if(!tx.length){document.getElementById('insBody').innerHTML=`<div class="panel empty">${isR?'No rewards in this period. Set a rewards rate (%) on your cards and add purchases to see rewards.':'No purchases in this period yet. Add transactions to see insights.'}</div>`;return}
+  if(!tx.length){renderCycles();document.getElementById('insBody').innerHTML=`<div class="panel empty">${isR?'No rewards in this period. Set a rewards rate (%) on your cards and add purchases to see rewards.':'No purchases in this period yet. Add transactions to see insights.'}</div>`;return}
   const groups=new Map();tx.forEach(t=>{const c=cardById(t.cardId);const key=insBy==='bank'?(c?c.bankId:'?'):t.cardId;const g=groups.get(key)||{key,total:0,n:0,c};g.total+=val(t);g.n++;groups.set(key,g)});
   let rows=[...groups.values()].sort((a,b)=>b.total-a.total);
   const top=rows[0],nameOf=g=>insBy==='bank'?bankName(g.c&&g.c.bankId):(g.c?g.c.name:'Deleted card');
@@ -599,7 +632,7 @@ function renderInsights(){
   document.getElementById('insBody').innerHTML=`<div class="inskpis"><div class="panel inskpi"><div class="k">${isR?'Rewards':'Total'}</div><div class="v">${money(total)}</div><div class="s">${months.length} month${months.length===1?'':'s'}</div></div><div class="panel inskpi"><div class="k">Avg / month</div><div class="v">${money(avg)}</div><div class="s">&nbsp;</div></div><div class="panel inskpi"><div class="k">Peak</div><div class="v">${money(byM[topM])}</div><div class="s">${lab(topM)}</div></div></div>
   <div class="panel inspanel"><h3>Monthly ${isR?'rewards':'spend'}</h3><div class="insdetail">${detail}</div><div class="insbars">${bars}</div><div class="insx">${xl}</div></div>
   <div class="panel inspanel"><h3>${isR?'Where rewards came from':'Where it went'}</h3><div class="insseg"><button class="${insBy==='card'?'on':''}" onclick="setInsBy('card')">By card</button><button class="${insBy==='bank'?'on':''}" onclick="setInsBy('bank')">By bank</button></div>${brk}</div><div id="insMerch"></div>`;
-  _mc={all:buildMerchants(tx,val),total,isR,months,lab,mn,val};if(insMerch&&!_mc.all.some(g=>g.key===insMerch))insMerch=null;renderMerchPanel();
+  _mc={all:buildMerchants(tx,val),total,isR,months,lab,mn,val};renderCycles();if(insMerch&&!_mc.all.some(g=>g.key===insMerch))insMerch=null;renderMerchPanel();
 }
 ['renderHome','renderCards','renderTransactions','renderInsights','renderAis'].forEach(n=>{const f=window[n];window[n]=function(){return withHolder(f)}});
 function render(){if(cardPageOpen()&&detailDialog.dataset.cardId&&state.cards.some(c=>c.id===detailDialog.dataset.cardId))openCard(detailDialog.dataset.cardId);renderHolderBar();renderHome();const _t=localStorage.getItem('cardly-tab')||'home';_dirty=new Set(['cards','transactions','insights','ais']);_dirty.delete('home');renderTabIfDirty(_t);updateNotifyBtn();maybeSendNotifications()}
@@ -973,6 +1006,24 @@ document.getElementById('notifyToggle').onclick=async()=>{
   if(perm!=='granted'){toast('Notifications are blocked — allow them for this page in Chrome\'s site settings.');updateNotifyBtn();return}
   localStorage.setItem(NOTIFY_KEY,'1');updateNotifyBtn();toast('✓ Due-date alerts on');maybeSendNotifications(true);
 };
+
+/* ===== Calendar reminders (.ics): recurring due-date / statement / renewal events with built-in alerts ===== */
+function icsEsc(t){return String(t).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n')}
+function icsFold(l){const o=[];while(l.length>73){o.push(l.slice(0,73));l=' '+l.slice(73)}o.push(l);return o.join('\r\n')}
+function icsDay(d){return d.replace(/-/g,'')}
+function nextOnDay(day,from){let y=Number(from.slice(0,4)),m=Number(from.slice(5,7))-1;let c=dateForMonth(y,m,day);if(c<from)c=dateForMonth(y,m+1,day);return c}
+function buildIcs(){const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,''),t0=today(),ev=[];
+  const add=(uid,sum,desc,date,rrule,alarms)=>{const L=['BEGIN:VEVENT','UID:'+uid+'@cardly','DTSTAMP:'+stamp,'DTSTART;VALUE=DATE:'+icsDay(date),'SUMMARY:'+icsEsc(sum),'DESCRIPTION:'+icsEsc(desc),'TRANSP:TRANSPARENT'];if(rrule)L.push('RRULE:'+rrule);alarms.forEach(a=>L.push('BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEsc(sum),'TRIGGER:'+a,'END:VALARM'));L.push('END:VEVENT');ev.push(L.map(icsFold).join('\r\n'))};
+  const monthly=d=>'FREQ=MONTHLY;BYMONTHDAY='+(d>=31?'-1':d);
+  state.cards.filter(c=>c.active!==false&&c.cardType!=='DEBIT').forEach(c=>{const nm=`${bankName(c.bankId)} ${c.name}${c.last4?' ••'+c.last4:''}`;
+    const dd=Number(c.dueDay);if(dd>=1&&dd<=31)add('due-'+c.id,`💳 ${nm} bill due`,`Pay the ${nm} credit card bill today.`,nextOnDay(dd,t0),monthly(dd),['-P2DT15H','-PT15H','PT9H']);
+    const sd=Number(c.statementDay);if(sd>=1&&sd<=31)add('stmt-'+c.id,`🧾 ${nm} statement today`,`New statement generated. Open Cardly and add the bill amount.`,nextOnDay(sd,t0),monthly(sd),['PT9H']);
+    if(!c.lifetimeFree&&c.renewalDate){const r=nextRenewalDate(c);add('fee-'+c.id,`🔁 ${nm} annual fee renews`,`Annual fee ${money(c.annualFee)}. Check the waiver milestone in Cardly.`,r,'FREQ=YEARLY',['-P6DT15H','-PT15H'])}});
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Cardly//Reminders//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','X-WR-CALNAME:Cardly reminders',...ev,'END:VCALENDAR'].join('\r\n')}
+async function exportIcs(){const text=buildIcs();if(!text.includes('BEGIN:VEVENT')){toast('Add due day / statement day to your cards first.');return}const name='cardly-reminders.ics';let done=false;
+  try{const f=new File([text],name,{type:'text/calendar'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});done=true}}catch(e){if(e&&e.name==='AbortError')return}
+  if(!done){const url=URL.createObjectURL(new Blob([text],{type:'text/calendar'})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  toast('✓ Calendar file ready — open it to add the reminders')}
 function maybeSendNotifications(force=false){
   if(!notifyEnabled())return;
   const todayKey=today();
@@ -1079,7 +1130,7 @@ cardBank.onchange=()=>{const isNew=cardBank.value==='__new__';cardNewBank.hidden
 function bankFromForm(f){let bankId=String(f.get('bank')||'').trim();if(bankId==='__new__'){const name=String(f.get('newBank')||'').trim();if(!name)throw new Error('Enter the new bank name.');return addBankEntity(name).id}if(!bankId)throw new Error('Select a bank.');if(!bankById(bankId))throw new Error('Select a bank.');return bankId}
 function showView(v){document.getElementById('cardPage').hidden=true;document.getElementById('dashboard').hidden=v!=='dashboard';document.getElementById('settingsPage').hidden=v!=='settings';if(v==='settings')renderSettings();else render();window.scrollTo(0,0)}
 function renderSettings(){
-  renderHolderSettings();cardViewSelect.value=cardViewMode();renderDriveSettings();homeLayoutSelect.value=homeLayout();
+  renderHolderSettings();cardViewSelect.value=cardViewMode();renderDriveSettings();
   const counts=new Map();state.cards.forEach(c=>{if(c.bankId)counts.set(c.bankId,(counts.get(c.bankId)||0)+1)});
   const banks=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
   document.getElementById('bankList').innerHTML=banks.length?banks.map(b=>{const n=counts.get(b.id)||0;return `<span class="bankchip">${bankTag(b.id)}<span>${esc(b.name)}</span><span class="bc">${n}</span><button class="chipbtn" title="Set logo URL" onclick="editBankLogo('${b.id}')">🖼</button><button class="chipbtn" title="Rename" onclick="renameBank('${b.id}')">✎</button>${n?'':`<button class="chipbtn" title="Remove (no cards use it)" onclick="removeBank('${b.id}')">✕</button>`}</span>`}).join(''):'<span class="muted">No banks yet. Add one below.</span>';
@@ -1098,7 +1149,6 @@ function renderHolderSettings(){const counts=new Map();state.cards.forEach(c=>co
 async function addHolder(){const name=String(newHolderName.value||'').trim();if(!name)return;if(holders().some(h=>h.name.toLowerCase()===name.toLowerCase())){toast('That holder already exists.');return}state.settings.holders=[...holders(),{id:id(),name}];newHolderName.value='';await commitSettings('✓ Holder added');render()}
 async function renameHolder(hid){const h=holders().find(x=>x.id===hid);if(!h)return;const name=String(prompt('Rename holder',h.name)||'').trim();if(!name||name===h.name)return;if(holders().some(x=>x.id!==hid&&x.name.toLowerCase()===name.toLowerCase())){toast('That name is already used.');return}h.name=name;await commitSettings('✓ Holder renamed');render()}
 async function removeHolder(hid){if(state.cards.some(c=>cardHolder(c)===hid)){toast('Move or delete this holder\'s cards first.');return}state.settings.holders=holders().filter(h=>h.id!==hid);if(activeHolder()===hid)try{localStorage.setItem('cardly-holder','me')}catch(e){}await commitSettings('✓ Holder removed');render()}
-homeLayoutSelect.onchange=async()=>{state.settings.homeLayout=homeLayoutSelect.value;await commitSettings('✓ Saved');try{renderHome()}catch(e){}};
 cardViewSelect.onchange=async()=>{state.settings.cardView=cardViewSelect.value;await commitSettings('✓ Saved')};
 addHolderBtn.onclick=addHolder;newHolderName.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();addHolder()}};
 addBankBtn.onclick=async()=>{const v=newBankName.value;await addBankFromSetting(v);newBankName.value=''};
@@ -1196,39 +1246,11 @@ addTxn.onclick=()=>openTxnFor(state.cards.find(c=>c.active!==false)?.id||'')
 
 let cardPageScrollY=0;
 function homeLayout(){const v=state.settings&&state.settings.homeLayout;return ['classic','alerts','tabs','collapse','slim'].includes(v)?v:'alerts'}
-let homeExtra=null;
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}}
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
-function applyHomeLayout(){
-  const $=id=>document.getElementById(id),L=homeLayout(),tab=$('tab-home');tab.dataset.layout=L;
-  const S={attention:$('homeAttention'),milestones:$('msWrap'),bills:$('billSection'),limits:$('utilSection'),renewals:$('renewalSection')};
-  const lab={attention:'Attention',bills:'Bills',milestones:'Milestones',limits:'Limits',renewals:'Renewals'};
-  const cnt=k=>S[k].querySelectorAll('.attrow').length;
-  const bar=$('homeLayoutBar');bar.innerHTML='';bar.hidden=true;
-  Object.values(S).forEach(e=>{e.hidden=false});
-  document.querySelectorAll('.attgroup').forEach(g=>{g.classList.remove('collapsible','isclosed');const h=g.querySelector('.sectionhead');if(h)h.onclick=null});
-  if(L==='slim'){$('cardsExtras').appendChild(S.limits);$('cardsExtras').appendChild(S.renewals)}
-  else{tab.appendChild(S.limits);tab.appendChild(S.renewals)}
-  const chips=(keys,active,onpick)=>{bar.hidden=false;bar.innerHTML=keys.map(k=>`<button class="chip filterchip${k===active?' active':''}" data-k="${k}">${lab[k]}${cnt(k)?` · ${cnt(k)}`:''}</button>`).join('');bar.querySelectorAll('button').forEach(b=>b.onclick=()=>onpick(b.dataset.k))};
-  if(L==='alerts'){
-    const ex=['attention','limits','renewals'].filter(k=>cnt(k)>0);if(!ex.includes(homeExtra))homeExtra=null;
-    ['attention','limits','renewals'].forEach(k=>{S[k].hidden=k!==homeExtra});
-    if(ex.length)chips(ex,homeExtra,k=>{homeExtra=homeExtra===k?null:k;applyHomeLayout()});
-  }else if(L==='tabs'){
-    const keys=['bills','milestones','attention','limits','renewals'];let t=lsGet('cardly-home-tab','bills');if(!keys.includes(t))t='bills';
-    keys.forEach(k=>{S[k].hidden=k!==t});chips(keys,t,k=>{lsSet('cardly-home-tab',k);applyHomeLayout()});
-  }else if(L==='collapse'){
-    let st={};try{st=JSON.parse(lsGet('cardly-home-collapsed','{}'))||{}}catch(e){}
-    Object.entries(S).forEach(([k,el])=>el.querySelectorAll('.attgroup').forEach(g=>{
-      const t=(g.querySelector('.sectiontitle')?.firstChild?.textContent||'').trim(),id=k+':'+t,def=/^(Limit utilisation|Upcoming renewals|Annual fee renewals|AIS reporting)/.test(t);
-      const closed=id in st?st[id]:def;g.classList.add('collapsible');g.classList.toggle('isclosed',closed);
-      g.querySelector('.sectionhead').onclick=()=>{st[id]=!g.classList.contains('isclosed');lsSet('cardly-home-collapsed',JSON.stringify(st));applyHomeLayout()};
-    }));
-  }else if(L==='slim'){
-    const n=cnt('limits'),r=cnt('renewals');
-    if(n||r){bar.hidden=false;bar.innerHTML=`<button class="chip filterchip" data-go="1">${n?`Limits · ${n}`:''}${n&&r?'  ':''}${r?`Renewals · ${r}`:''} →  see on Cards tab</button>`;bar.firstChild.onclick=()=>{setTab('cards');window.scrollTo(0,0)}}
-  }
-}
+function applyHomeLayout(){const $=id=>document.getElementById(id);$('tab-home').dataset.layout='v2';
+  const hasMs=state.milestones.some(m=>m.active!==false&&state.cards.some(c=>c.id===m.cardId&&c.active!==false));$('msWrap').hidden=!hasMs;
+  ['billSection','utilSection'].forEach(k=>{$(k).hidden=!$(k).innerHTML.trim()})}
 {const f=window.renderHome;window.renderHome=function(){const r=f.apply(this,arguments);applyHomeLayout();return r}}
 function cardViewMode(){return (state.settings&&state.settings.cardView==='dialog')?'dialog':'page'}
 function cardPageOpen(){return !document.getElementById('cardPage').hidden}
@@ -1275,6 +1297,7 @@ function openCard(cardId){
     <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Milestones</div><button class="btn" onclick="openNewMilestone('${c.id}')">+ Add Milestone</button></div>
       ${ms.length?ms.map(m=>{const v=isWindows(m)?(windowInfo(m,c)||{v:0}).v:spend(m.cardId,m.periodType,m),p=Math.min(100,v/Number(m.targetAmount)*100),note=milestoneNote(c,m,v);return `<div class="milestone panel cardrow"><div class="milestonehead"><strong>${esc(m.name)}</strong><div class="milestone-actions"><span>${Math.round(p)}%</span><button class="btn milestone-edit-btn" onclick="openMilestone('${m.id}')">Edit</button></div></div><div class="meta">${esc(milestonePeriodLabel(m.periodType,m))}</div><div class="bar"><div class="fill" style="width:${p}%"></div></div><div class="meta">${money(v)} / ${money(m.targetAmount)} · ${money(Math.max(0,Number(m.targetAmount)-v))} remaining</div>${note?`<div class="meta" style="margin-top:4px">${note}</div>`:''}</div>`}).join(''):'<div class="panel empty">No milestones configured.</div>'}
     </div>
+    ${cardCyclesPanel(c)}
     <div class="detail-section"><div class="sectionhead"><div class="sectiontitle">Transactions</div><div style="display:flex;gap:8px"><button class="btn" onclick="nestedFromDetail();reconOpen('${c.id}')">Reconcile</button><button class="btn" onclick="nestedFromDetail();openTxnFor('${c.id}')">+ Add</button></div></div>
       ${txnGroupsDetail(ts,cardId)}
     </div>`;
