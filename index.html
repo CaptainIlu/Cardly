@@ -119,6 +119,8 @@ details.attgroup>summary.sectionhead{cursor:pointer;list-style:none;display:flex
 .rc-act{margin-top:10px;display:flex;justify-content:flex-end}
 .aisbar{position:relative;overflow:hidden}.aisbar .fill{position:absolute;top:0;bottom:0;height:auto}.aisbar .fill:first-child{left:0}.aisbar .f2{background:repeating-linear-gradient(45deg,var(--accent),var(--accent) 4px,transparent 4px,transparent 8px);opacity:.55}.aisbar .f3{background:var(--accent);opacity:.25}
 .aisproj{margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(128,128,128,.10)}.aisproj.over{background:rgba(220,70,60,.10)}.aisproj-h{display:flex;justify-content:space-between;font-size:14px}.aisproj-l{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin-top:6px}.aisproj-l .d{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;background:var(--accent)}.aisproj-l .d2{opacity:.55}.aisproj-l .d3{opacity:.25}
+.sync-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}.sync-cmp>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel)}.sync-cmp>div:last-child{border-color:var(--accent)}.sync-cmp .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}.sync-cmp .v{font-weight:700;font-size:14px;margin:2px 0}.sync-cmp .s{font-size:12px;color:var(--muted)}
+.sync-btns{display:flex;flex-direction:column;gap:8px}.sync-btns .btn{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;padding:10px 14px;height:auto}.sync-btns .btn small{font-weight:400;opacity:.8;font-size:12px}
 </style>
 </head>
 <body>
@@ -288,6 +290,13 @@ details.attgroup>summary.sectionhead{cursor:pointer;list-style:none;display:flex
 </form></div></dialog>
 
 <dialog id="pdfPwDialog"><form method="dialog" class="modal" id="pdfPwForm" style="max-width:380px"><div class="modalhead"><h2>PDF password</h2><button type="button" class="iconbtn" id="pdfPwX">×</button></div><p class="meta" id="pdfPwMsg" style="margin:0 0 10px">This statement is password protected.</p><input type="password" id="pdfPwInput" autocomplete="off" placeholder="Password" style="width:100%;margin-bottom:10px"><label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:14px"><input type="checkbox" id="pdfPwRemember" checked style="width:auto"> Remember for this card on this device</label><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" id="pdfPwCancel">Cancel</button><button type="submit" class="btn primary">Unlock</button></div></form></dialog>
+<dialog id="syncDialog"><div class="modal" style="max-width:460px"><div class="modalhead"><h2>Newer data found</h2></div>
+<p class="meta" style="margin:0 0 12px">This data was updated somewhere else (another tab, or another device) after this tab opened. Saving now would overwrite it. Choose how to continue.</p>
+<div id="syncCmp" class="sync-cmp"></div>
+<div class="sync-btns"><button class="btn primary" id="syncMerge"><b>Keep both (recommended)</b><small>Combine the two. For anything edited in both, the most recent edit wins. Deleted items stay deleted.</small></button>
+<button class="btn" id="syncDisk"><b>Use the newer data</b><small>Discard what’s in this tab.</small></button>
+<button class="btn" id="syncMine"><b>Overwrite with this tab</b><small>Replaces the newer data. Only if this tab is the correct one.</small></button>
+<button class="rc-link" id="syncCopy" style="text-align:center">Download a copy of the newer data first</button><button class="btn" id="syncCancel">Not now</button></div></div></dialog>
 <dialog id="reconDialog"><div class="modal rc" style="max-height:90vh;overflow-y:auto"><div class="modalhead"><h2>Reconcile statement</h2><button class="iconbtn" onclick="reconDialog.close()">×</button></div>
 <div class="rc-top"><select id="reconCard" aria-label="Card"></select><div id="reconDrop" class="rc-drop" onclick="document.getElementById('reconFile').click()"><input id="reconFile" type="file" accept="application/pdf,.pdf" style="display:none"><span class="rc-dic">📄</span><span class="rc-dtx"><strong id="reconDropTitle">Choose statement PDF</strong><small>or drop it here · read on this device only</small></span></div></div>
 <div style="text-align:right;margin:-4px 0 6px"><button class="rc-link" id="reconForgetPw" hidden onclick="reconForgetPw()">Forget saved PDF passwords</button></div>
@@ -326,14 +335,68 @@ details.attgroup>summary.sectionhead{cursor:pointer;list-style:none;display:flex
 let dataFileHandle=null, mobileStorage=false, state={cards:[],milestones:[],transactions:[],banks:[]};
 const stores=['cards','milestones','transactions','banks'];
 function all(store){return Promise.resolve([...state[store]])}
-function serialisedData(){return {format:'cardly-data',version:1,...state}}
+function serialisedData(){return {format:'cardly-data',version:1,...state,updatedAt:dataStamp}}
 let _saving=null,_savePending=null;
 function saveDataFile(){if(!_saving){_saving=_saveDataFileNow().finally(()=>{_saving=null});return _saving}if(!_savePending){_savePending=_saving.catch(()=>{}).then(()=>{_savePending=null;return saveDataFile()})}return _savePending}
-async function _saveDataFileNow(){if(dataFileHandle){const writable=await dataFileHandle.createWritable();await writable.write(JSON.stringify(serialisedData()));await writable.close();backupChanged();gistChanged();fbChanged();return}if(mobileStorage){await saveMobileData();backupChanged();gistChanged();fbChanged();return}throw new Error('Open a Cardly data file first.')}
+/* ===== Freshness / multi-tab safety =====
+   Every save stamps the whole file (updatedAt) and each record (updatedAt). Before writing, we check whether the file on disk is newer than
+   what this tab last loaded/saved; if so we never overwrite silently — we offer to merge (per-record newest wins, deletions remembered). */
+let dataStamp=0,baseStamp=0,lastFileMod=null,forceNext=false,unsavedLocal=false,_conflict=null;
+const STAMP_KEY='cardly-stamp';
+function bumpStamp(){dataStamp=Math.max(Date.now(),dataStamp+1);return dataStamp}
+function markRestored(){bumpStamp();baseStamp=dataStamp;forceNext=true;lsSet(STAMP_KEY,String(dataStamp))}
+function tomb(store,id_){if(!Array.isArray(state.deleted))state.deleted=[];state.deleted.push({s:store,id:id_,ts:Date.now()});if(state.deleted.length>4000)state.deleted=state.deleted.slice(-3000)}
+async function readDisk(){
+  if(dataFileHandle&&!dataFileHandle.isNative){const f=await dataFileHandle.getFile();if(f.lastModified&&f.lastModified===lastFileMod)return null;let d=null;try{d=JSON.parse(await f.text())}catch(e){}return{data:d,stamp:Number(d&&d.updatedAt)||0,mod:f.lastModified,where:'the data file'}}
+  if(mobileStorage&&!dataFileHandle){const ls=Number(lsGet('cardly-mobile-stamp','0'))||0;if(ls<=baseStamp)return null;const d=await getMobileData();return{data:d,stamp:Number(d&&d.updatedAt)||0,where:'another tab on this device'}}
+  return null}
+function mergeData(L,Dk){const tm=new Map();[...(L.deleted||[]),...(Dk.deleted||[])].forEach(t=>{const k=t.s+':'+t.id;if(!tm.has(k)||tm.get(k)<t.ts)tm.set(k,t.ts)});const out={},u=x=>Number(x&&x.updatedAt)||0;
+  stores.forEach(st=>{const m=new Map();(Dk[st]||[]).forEach(x=>m.set(x.id,x));(L[st]||[]).forEach(x=>{const o=m.get(x.id);if(!o||u(x)>u(o))m.set(x.id,x)});out[st]=[...m.values()].filter(x=>{const t=tm.get(st+':'+x.id);return !(t&&t>u(x))})});
+  out.settings={...(L.settings||{}),...(Dk.settings||{})};out.idScheme=L.idScheme||Dk.idScheme||1;out.deleted=[...tm].map(([k,ts])=>{const i=k.indexOf(':');return{s:k.slice(0,i),id:k.slice(i+1),ts}}).slice(-4000);return out}
+function fmtStamp(t){return t?new Date(t).toLocaleString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'}):'unknown'}
+function askConflict(disk){return new Promise(res=>{const d=document.getElementById('syncDialog');let done=false;const fin=v=>{if(done)return;done=true;d.close();res(v)};
+  const cnt=x=>`${(x.transactions||[]).length} transactions · ${(x.cards||[]).length} cards`;
+  document.getElementById('syncCmp').innerHTML=`<div><div class="k">This tab</div><div class="v">${esc(fmtStamp(baseStamp))}</div><div class="s">${cnt(state)}</div></div><div><div class="k">Newer data in ${esc(disk.where)}</div><div class="v">${esc(fmtStamp(disk.stamp))}</div><div class="s">${cnt(disk.data)}</div></div>`;
+  const mism=(disk.data.idScheme||1)!==(state.idScheme||1),mb=document.getElementById('syncMerge');mb.disabled=mism;mb.querySelector('small').textContent=mism?'Not possible: the two copies use different ID formats (one was shortened). Use the newer data.':'Combine the two. For anything edited in both, the most recent edit wins. Deleted items stay deleted.';mb.onclick=()=>fin('merge');document.getElementById('syncDisk').onclick=()=>fin('disk');document.getElementById('syncMine').onclick=()=>{if(confirm('Overwrite the newer data with what is in this tab? Anything saved elsewhere since this tab was opened will be lost.'))fin('mine')};document.getElementById('syncCancel').onclick=()=>fin('cancel');
+  document.getElementById('syncCopy').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(disk.data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='cardly-data-newer-copy.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+  d.oncancel=e=>{e.preventDefault();fin('cancel')};d.showModal()})}
+async function resolveConflict(disk){if(_conflict)return _conflict;_conflict=(async()=>{try{const c=await askConflict(disk);
+    if(c==='merge'){state=mergeData(state,disk.data);cacheVer++;baseStamp=Math.max(baseStamp,disk.stamp);dataStamp=Math.max(dataStamp,disk.stamp);if(disk.mod)lastFileMod=disk.mod;try{render()}catch(e){}return}
+    if(c==='mine'){baseStamp=Math.max(baseStamp,disk.stamp);if(disk.mod)lastFileMod=disk.mod;return}
+    if(c==='disk'){applyData(disk.data);if(disk.mod)lastFileMod=disk.mod;unsavedLocal=false;try{render()}catch(e){}const e=new Error('Loaded the newer data — your last change was not applied. Please redo it.');e.synced=true;throw e}
+    throw new Error('Not saved — the data was changed elsewhere. Your change is kept in this tab; it will be offered again on the next save.')}finally{_conflict=null}})();return _conflict}
+async function ensureFresh(){if(forceNext){forceNext=false;return}const disk=await readDisk();if(!disk)return;if(!disk.data||!Array.isArray(disk.data.cards)){return}if(disk.stamp<=baseStamp){if(disk.mod)lastFileMod=disk.mod;return}await resolveConflict(disk)}
+async function checkFresh(){if(_conflict||_saving||_savePending||!(dataFileHandle||mobileStorage)||(dataFileHandle&&dataFileHandle.isNative)||document.querySelector('dialog[open]'))return;try{if(unsavedLocal){await saveDataFile();return}const disk=await readDisk();if(!disk||!disk.data||!Array.isArray(disk.data.cards))return;if(disk.stamp<=baseStamp){if(disk.mod)lastFileMod=disk.mod;return}applyData(disk.data);if(disk.mod)lastFileMod=disk.mod;await load();toast('✓ Refreshed — data was updated in another tab or device')}catch(e){}}
+async function _saveDataFileNow(){if(!dataFileHandle&&!mobileStorage)throw new Error('Open a Cardly data file first.');
+  try{await ensureFresh();bumpStamp();
+    if(dataFileHandle){const writable=await dataFileHandle.createWritable();await writable.write(JSON.stringify(serialisedData()));await writable.close();try{lastFileMod=(await dataFileHandle.getFile()).lastModified||null}catch(e){}}
+    else await saveMobileData();
+    baseStamp=dataStamp;unsavedLocal=false;lsSet(STAMP_KEY,String(dataStamp));try{_bc&&_bc.postMessage(dataStamp)}catch(e){}
+    backupChanged();gistChanged();fbChanged()}
+  catch(e){if(!e.synced)unsavedLocal=true;throw e}}
+let _bc=null;try{_bc=new BroadcastChannel('cardly-sync');_bc.onmessage=()=>checkFresh()}catch(e){}
+window.addEventListener('storage',ev=>{if(ev.key===STAMP_KEY||ev.key==='cardly-mobile-stamp')checkFresh()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkFresh()});window.addEventListener('focus',()=>checkFresh());setInterval(()=>{if(!document.hidden)checkFresh()},20000);
 let lastCreatedAt=0;
-async function put(store,obj){if(!stores.includes(store))throw new Error('Unknown data type.');const rows=state[store],index=rows.findIndex(x=>x.id===obj.id);if(index<0){if(store==='transactions'&&!obj.createdAt){lastCreatedAt=Math.max(Date.now(),lastCreatedAt+1);obj.createdAt=lastCreatedAt}rows.push(obj)}else rows[index]=obj;cacheVer++;await saveDataFile();return obj}
-async function del(store,id){if(!stores.includes(store))throw new Error('Unknown data type.');state[store]=state[store].filter(x=>x.id!==id);cacheVer++;await saveDataFile()}
-const id=()=>crypto.randomUUID();
+async function put(store,obj){if(!stores.includes(store))throw new Error('Unknown data type.');obj.updatedAt=Date.now();const rows=state[store],index=rows.findIndex(x=>x.id===obj.id);if(index<0){if(store==='transactions'&&!obj.createdAt){lastCreatedAt=Math.max(Date.now(),lastCreatedAt+1);obj.createdAt=lastCreatedAt}rows.push(obj)}else rows[index]=obj;cacheVer++;await saveDataFile();return obj}
+async function del(store,id){if(!stores.includes(store))throw new Error('Unknown data type.');state[store]=state[store].filter(x=>x.id!==id);tomb(store,id);cacheVer++;await saveDataFile()}
+const ID_CH='0123456789abcdefghijklmnopqrstuvwxyz';
+const id=()=>{const a=new Uint8Array(8);crypto.getRandomValues(a);let r='';for(const b of a)r+=ID_CH[b%36];return r};
+/* One-time migration: long UUID ids -> short ids (smaller file). All references are remapped; a safety copy is kept in this browser first. */
+const isLongId=x=>typeof x==='string'&&x.length>16;
+async function shortenIds(){if(state.idScheme===2)return false;
+  const longs=[];['cards','milestones','transactions','banks'].forEach(st=>state[st].forEach(x=>{if(isLongId(x.id))longs.push(x)}));(state.settings&&state.settings.holders||[]).forEach(h=>{if(isLongId(h.id))longs.push(h)});
+  if(!longs.length){state.idScheme=2;return true}
+  try{const d=await openHandleDB();await new Promise((res,rej)=>{const r=d.transaction('mobileData','readwrite').objectStore('mobileData').put(JSON.stringify(serialisedData()),'backup-before-short-ids');r.onsuccess=res;r.onerror=()=>rej(r.error)});d.close()}catch(e){}
+  const used=new Set(),map=new Map();['cards','milestones','transactions','banks'].forEach(st=>state[st].forEach(x=>{if(!isLongId(x.id))used.add(x.id)}));
+  longs.forEach(x=>{if(map.has(x.id))return;let n;do{n=id()}while(used.has(n));used.add(n);map.set(x.id,n)});
+  const m=v=>map.get(v)||v;
+  state.cards.forEach(c=>{c.id=m(c.id);if(c.bankId)c.bankId=m(c.bankId);if(c.holderId)c.holderId=m(c.holderId)});state.banks.forEach(b=>{b.id=m(b.id)});
+  state.milestones.forEach(x=>{x.id=m(x.id);x.cardId=m(x.cardId)});state.transactions.forEach(t=>{t.id=m(t.id);t.cardId=m(t.cardId);if(t.refundOf)t.refundOf=m(t.refundOf)});
+  if(state.settings&&Array.isArray(state.settings.holders))state.settings.holders.forEach(h=>{h.id=m(h.id)});
+  if(Array.isArray(state.deleted))state.deleted.forEach(t=>{t.id=m(t.id)});
+  try{const pw=JSON.parse(localStorage.getItem('cardly-pdf-pw')||'{}'),np={};Object.keys(pw).forEach(k=>np[m(k)]=pw[k]);localStorage.setItem('cardly-pdf-pw',JSON.stringify(np));const tc=localStorage.getItem('cardly-txn-card');if(tc)localStorage.setItem('cardly-txn-card',m(tc));const h=localStorage.getItem('cardly-holder');if(h)localStorage.setItem('cardly-holder',m(h))}catch(e){}
+  state.idScheme=2;cacheVer++;return true}
 const money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n||0);
 function ymd(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 const today=()=>ymd(new Date());
@@ -395,6 +458,9 @@ function msForecast(c,m,v){const target=Number(m.targetAmount)||0;if(!(target>0)
   if(left===0)return `<span style="color:var(--bad)">Forecast: last day — ${money(need)} needed today</span>`;
   if(v<=0||elapsed<4)return `<span style="color:var(--muted)">Forecast: too early to tell · needs ${money(req)}/day</span>`;
   if(proj>=target){const d=Math.max(0,Math.ceil(need/rate));return `<span style="color:var(--good)">▲ On track · likely by ${esc(displayDate(addDays(t0,d)))} · projected ${money(proj)}</span>`}
+  const long=s0&&(new Date(e)-new Date(s0))/864e5>90,day=Number(c.statementDay);
+  if(long&&day>=1&&day<=31){let n=0;const T=new Date(t0+'T00:00:00');for(let k=0;k<=14;k++){const ds=dateForMonth(T.getFullYear(),T.getMonth()+k,day);if(ds>t0&&ds<=e)n++}n=Math.max(1,n);const perStm=need/n,nowStm=rate*30.44;
+    return `<span style="color:var(--bad)">▼ Behind pace · projected ${money(proj)} of ${money(target)} · needs ${money(perStm)}/statement over ${n} statement${n===1?'':'s'} (now ~${money(nowStm)}/statement)</span>`}
   return `<span style="color:var(--bad)">▼ Behind pace · projected ${money(proj)} of ${money(target)} · needs ${money(req)}/day (now ${money(rate)}/day)</span>`}
 function milestoneNote(c,m,v){const n=milestoneNote0(c,m,v),f=msForecast(c,m,v);return n+(f?(n?'<br>':'')+f:'')}
 function milestoneNote0(c,m,v){if(isWindows(m)){const i=windowInfo(m,c);if(!i)return '';const need=Number(m.targetAmount);return `${m.combine?'Next window':'Next'}: ${esc(i.label||displayDate(i.focus))}${i.group&&i.group.first<=today()&&i.group.last>=today()?' (on now)':i.focus===today()?' (today)':''} — ${i.v>=need?'✓ done':money(Math.max(0,need-i.v))+' to go'}<br>This month: ${windowChips(i)}`}const[,e]=periodRange(m.periodType,c,m);if(!e)return '';const target=Number(m.targetAmount);if(m.periodType==='MEMBERSHIP_YEAR'&&isFeeWaiver(m))return v>=target?`🎉 Fee waived for the ${esc(displayDate(nextRenewalDate(c)))} renewal`:`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))} to waive next year's fee`;return v>=target?'✓ Target reached':`${money(Math.max(0,target-v))} more by ${esc(displayDate(e))}`}
@@ -662,20 +728,20 @@ function renderInsights(){
 }
 ['renderHome','renderCards','renderTransactions','renderInsights','renderAis'].forEach(n=>{const f=window[n];window[n]=function(){return withHolder(f)}});
 function render(){if(cardPageOpen()&&detailDialog.dataset.cardId&&state.cards.some(c=>c.id===detailDialog.dataset.cardId))openCard(detailDialog.dataset.cardId);renderHolderBar();renderHome();const _t=localStorage.getItem('cardly-tab')||'home';_dirty=new Set(['cards','transactions','insights','ais']);_dirty.delete('home');renderTabIfDirty(_t);updateNotifyBtn();maybeSendNotifications()}
-async function load(){const settingsChanged=ensureSettings(),banksChanged=ensureBanks();if(settingsChanged||banksChanged){try{await saveDataFile()}catch{}}for(const c of [...state.cards]){let changed=false;if(c.billDate==null){c.billDate=c.paymentDate||today();changed=true}if(c.paidAmount!=null&&Number(c.paidAmount)>0&&!c.legacyPaymentMigrated){const legacy={id:id(),cardId:c.id,date:c.paymentDate||today(),merchant:'Bill Payment',amount:Number(c.paidAmount),type:'PAYMENT',status:'COMPLETED',refundDate:''};state.transactions.push(legacy);await put('transactions',legacy);c.legacyPaymentMigrated=true;changed=true}if(changed)await put('cards',c)}for(const t of [...state.transactions]){let changed=false;if(!t.type)t.type='PURCHASE',changed=true;if(!t.status){t.status='COMPLETED';changed=true}if(t.refundDate==null){t.refundDate='';changed=true}if(changed)await put('transactions',t)}render()}
+async function load(){const settingsChanged=ensureSettings(),banksChanged=ensureBanks();let idsChanged=false;try{idsChanged=await shortenIds()}catch(e){console.error(e)}if(settingsChanged||banksChanged||idsChanged){try{await saveDataFile()}catch{}}for(const c of [...state.cards]){let changed=false;if(c.billDate==null){c.billDate=c.paymentDate||today();changed=true}if(c.paidAmount!=null&&Number(c.paidAmount)>0&&!c.legacyPaymentMigrated){const legacy={id:id(),cardId:c.id,date:c.paymentDate||today(),merchant:'Bill Payment',amount:Number(c.paidAmount),type:'PAYMENT',status:'COMPLETED',refundDate:''};state.transactions.push(legacy);await put('transactions',legacy);c.legacyPaymentMigrated=true;changed=true}if(changed)await put('cards',c)}for(const t of [...state.transactions]){let changed=false;if(!t.type)t.type='PURCHASE',changed=true;if(!t.status){t.status='COMPLETED';changed=true}if(t.refundDate==null){t.refundDate='';changed=true}if(changed)await put('transactions',t)}render()}
 function setFileError(message=''){document.getElementById('dataFileError').textContent=message}
 function openHandleDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open('cardly-file-link',2);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('settings'))d.createObjectStore('settings');if(!d.objectStoreNames.contains('mobileData'))d.createObjectStore('mobileData')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 async function rememberFileHandle(handle){const d=await openHandleDB();await new Promise((resolve,reject)=>{const r=d.transaction('settings','readwrite').objectStore('settings').put(handle,'dataFile');r.onsuccess=resolve;r.onerror=()=>reject(r.error)});d.close()}
 async function getRememberedFileHandle(){const d=await openHandleDB();const handle=await new Promise((resolve,reject)=>{const r=d.transaction('settings').objectStore('settings').get('dataFile');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});d.close();return handle}
-async function saveMobileData(){const d=await openHandleDB();await new Promise((resolve,reject)=>{const r=d.transaction('mobileData','readwrite').objectStore('mobileData').put(serialisedData(),'data');r.onsuccess=resolve;r.onerror=()=>reject(r.error)});d.close();try{localStorage.setItem('cardly-mobile-dirty','1')}catch(e){}updateSyncStatus()}
+async function saveMobileData(){const d=await openHandleDB();await new Promise((resolve,reject)=>{const r=d.transaction('mobileData','readwrite').objectStore('mobileData').put(serialisedData(),'data');r.onsuccess=()=>{lsSet('cardly-mobile-stamp',String(dataStamp));resolve()};r.onerror=()=>reject(r.error)});d.close();try{localStorage.setItem('cardly-mobile-dirty','1')}catch(e){}updateSyncStatus()}
 async function getMobileData(){const d=await openHandleDB();const data=await new Promise((resolve,reject)=>{const r=d.transaction('mobileData').objectStore('mobileData').get('data');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});d.close();return data}
-function applyData(data){cacheVer++;if(!data||!Array.isArray(data.cards)||!Array.isArray(data.milestones)||!Array.isArray(data.transactions))throw new Error('This file is not a valid Cardly data file.');state={cards:data.cards,milestones:data.milestones,transactions:data.transactions,settings:data.settings,banks:Array.isArray(data.banks)?data.banks:[]}}
+function applyData(data){cacheVer++;if(!data||!Array.isArray(data.cards)||!Array.isArray(data.milestones)||!Array.isArray(data.transactions))throw new Error('This file is not a valid Cardly data file.');state={cards:data.cards,milestones:data.milestones,transactions:data.transactions,settings:data.settings,banks:Array.isArray(data.banks)?data.banks:[],deleted:Array.isArray(data.deleted)?data.deleted:[],idScheme:data.idScheme||1};dataStamp=baseStamp=Number(data.updatedAt)||0;unsavedLocal=false}
 function showDashboard(){document.getElementById('cardPage').hidden=true;document.getElementById('dataGate').hidden=true;document.getElementById('dashboard').hidden=false;document.getElementById('settingsPage').hidden=true;setTab(localStorage.getItem('cardly-tab')||'home');document.getElementById('settingsBtn').hidden=false;document.getElementById('exportDataFile').hidden=!mobileStorage;document.getElementById('reloadDataFile').hidden=!mobileStorage;updateSyncStatus();setFileError('')}
-async function useDataFile(handle,createNew=false){dataFileHandle=handle;mobileStorage=false;try{if(createNew){state={cards:[],milestones:[],transactions:[],banks:[]};await saveDataFile()}else{const file=await handle.getFile(),text=await file.text();if(!text.trim()){state={cards:[],milestones:[],transactions:[],banks:[]};await saveDataFile()}else applyData(JSON.parse(text))}await load();if(!handle.isNative)await rememberFileHandle(handle);showDashboard()}catch(err){dataFileHandle=null;setFileError(`Could not open that file: ${err.message}`)}}
-async function importDataFile(file){try{applyData(JSON.parse(await file.text()));dataFileHandle=null;mobileStorage=true;await saveMobileData();await load();try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}showDashboard()}catch(err){setFileError(`Could not import that file: ${err.message}`)}}
+async function useDataFile(handle,createNew=false){dataFileHandle=handle;mobileStorage=false;try{if(createNew){state={cards:[],milestones:[],transactions:[],banks:[]};await saveDataFile()}else{const file=await handle.getFile(),text=await file.text();if(!text.trim()){state={cards:[],milestones:[],transactions:[],banks:[]};await saveDataFile()}else{applyData(JSON.parse(text));lastFileMod=file.lastModified||null}}await load();if(!handle.isNative)await rememberFileHandle(handle);showDashboard()}catch(err){dataFileHandle=null;setFileError(`Could not open that file: ${err.message}`)}}
+async function importDataFile(file){try{applyData(JSON.parse(await file.text()));markRestored();dataFileHandle=null;mobileStorage=true;await saveMobileData();await load();try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}showDashboard()}catch(err){setFileError(`Could not import that file: ${err.message}`)}}
 async function exportMobileData(){const text=JSON.stringify(serialisedData(),null,2),name='cardly-data.json';let done=false;try{const f=new File([text],name,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});done=true}}catch(e){if(e&&e.name==='AbortError')return}if(!done){const url=URL.createObjectURL(new Blob([text],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);done=true}try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}updateSyncStatus()}
 function mobileDirty(){try{return localStorage.getItem('cardly-mobile-dirty')==='1'}catch(e){return false}}
-function updateSyncStatus(){const el=document.getElementById('dashSub');if(!el)return;if(!mobileStorage){el.textContent='Your data stays on this device.'+backupSuffix();return}let t='';try{const v=Number(localStorage.getItem('cardly-mobile-synced')||0);if(v)t=new Date(v).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}catch(e){}el.textContent=(t?`File loaded/saved ${t}`:'Data kept on this phone')+(mobileDirty()?' · ● changes not saved to file':'')+backupSuffix()}
+function updateSyncStatus(){const el=document.getElementById('dashSub');if(!el)return;if(!mobileStorage){el.textContent='Your data stays on this device.'+(dataStamp?' Last saved '+fmtStamp(dataStamp)+'.':'')+backupSuffix();return}let t='';try{const v=Number(localStorage.getItem('cardly-mobile-synced')||0);if(v)t=new Date(v).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})}catch(e){}el.textContent=(t?`File loaded/saved ${t}`:'Data kept on this phone')+(mobileDirty()?' · ● changes not saved to file':'')+backupSuffix()}
 async function chooseDataFile(createNew=false){setFileError('');if(nativeFileApi){try{await nativeFileApi.pick();await useDataFile(makeNativeHandle(),false)}catch(err){if(!/cancel/i.test(String((err&&err.message)||err)))setFileError(String((err&&err.message)||err))}return}try{if(!('showOpenFilePicker'in window)||!('showSaveFilePicker'in window))throw new Error('This Chrome version does not support direct local-file saving. Update Chrome and reopen index.html.');const options={types:[{description:'Cardly data',accept:{'application/json':['.json']}}]};const handle=createNew?await window.showSaveFilePicker({suggestedName:'cardly-data.json',...options}):(await window.showOpenFilePicker({...options,multiple:false}))[0];if(handle)await useDataFile(handle,createNew)}catch(err){if(err.name!=='AbortError')setFileError(err.message)}}
 async function reopenLastDataFile(){setFileError('');try{const handle=await getRememberedFileHandle();if(!handle)throw new Error('No previously opened Cardly data file was found.');let permission=await handle.queryPermission({mode:'readwrite'});if(permission!=='granted')permission=await handle.requestPermission({mode:'readwrite'});if(permission!=='granted')throw new Error('Chrome did not grant permission to this file. Choose Open Data File to select it again.');await useDataFile(handle)}catch(err){setFileError(err.message)}}
 
@@ -711,13 +777,14 @@ async function idbPut(k,v){const d=await openHandleDB();await new Promise((res,r
 function backupChanged(){if(!backupOn())return;setBMeta({dirty:true,changedAt:Date.now()});backupRefreshUI();backupSchedule()}
 function backupSchedule(){clearTimeout(backupTimer);if(!backupAutoOn()||!driveToken())return;backupTimer=setTimeout(()=>backupNow(false),20000)}
 /* push local data to Drive. manual=true may open the Google sign-in popup (needs a tap). */
+function stampGuard(m){const known=Math.max(Number(lsGet(STAMP_KEY,'0'))||0,Number(m&&m.stamp)||0);if(dataStamp&&dataStamp<known)throw new Error('This tab has older data than another tab or the last backup — reload the page before backing up.')}
 async function backupNow(manual){if(backupBusy||!backupOn())return;backupErr='';
   if(!driveToken()){if(!manual){backupRefreshUI();return}try{await driveSignIn()}catch(e){backupErr=e.message;backupRefreshUI();toast(e.message);return}}
   backupBusy=true;backupRefreshUI();const started=Date.now();
-  try{let id=bMeta().fileId,f;
+  try{stampGuard(bMeta());let id=bMeta().fileId,f;
     if(id){try{f=await driveUpload(id)}catch(e){if(e.status===404)id=null;else throw e}}
     if(!id){const found=await driveFind();f=found?await driveUpload(found.id):await driveUpload(null);id=f.id}
-    setBMeta({fileId:id,last:Date.now(),dirty:(bMeta().changedAt||0)>started});if(manual)toast('✓ Backed up to Google Drive')
+    setBMeta({fileId:id,stamp:dataStamp,last:Date.now(),dirty:(bMeta().changedAt||0)>started});if(manual)toast('✓ Backed up to Google Drive')
   }catch(e){backupErr=e.needAuth?'':e.message;if(manual||!e.needAuth)toast(e.message)}
   finally{backupBusy=false;backupRefreshUI();if(bMeta().dirty&&driveToken()&&!backupErr)backupSchedule()}}
 async function connectBackup(){try{await driveSignIn()}catch(e){toast(e.message);return}
@@ -730,7 +797,7 @@ async function connectBackup(){try{await driveSignIn()}catch(e){toast(e.message)
 async function restoreFromDrive(fromGate){try{if(!driveToken())await driveSignIn()}catch(e){toast(e.message);setFileError(e.message);return}
   try{const f=await driveFind();if(!f){toast('No Cardly file found in your Google Drive.');setFileError('No Cardly file found in your Google Drive.');return}
     if(!fromGate&&!confirm(`Replace ALL data on this device with the Google Drive copy from ${fmtT(f.modifiedTime)}?\n\nWhat is currently on this device will be overwritten.`))return;
-    const data=await driveDownload(f.id);applyData(data);
+    const data=await driveDownload(f.id);applyData(data);markRestored();
     if(fromGate){mobileStorage=true;dataFileHandle=null}
     await saveDataFile();await load();setBMeta({connected:true,fileId:f.id,last:Date.now(),dirty:false,...(bMeta().connected?{}:{auto:!!supportsDirectFileAccess})});
     if(fromGate){try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}showDashboard()}
@@ -789,11 +856,11 @@ function renderGistSettings(){const c=document.getElementById('gistConnectBtn');
 function gistChanged(){if(!gistOn())return;setGMeta({dirty:true,changedAt:Date.now()});renderGistSettings();gistSchedule()}
 function gistSchedule(){clearTimeout(gistTimer);if(!gistAutoOn())return;gistTimer=setTimeout(()=>gistNow(false),20000)}
 async function gistNow(manual){if(gistBusy||!gistOn())return;gistErr='';gistBusy=true;renderGistSettings();const started=Date.now();
-  try{const pass=dLS.get('cardly-gist-pass');if(!pass)throw new Error('Passphrase missing on this device — reconnect.');const m=gMeta();
+  try{stampGuard(gMeta());const pass=dLS.get('cardly-gist-pass');if(!pass)throw new Error('Passphrase missing on this device — reconnect.');const m=gMeta();
     if(m.gistId&&m.ver){const h=await gistHead(m.gistId);if(h&&h.ver!==m.ver){if(!manual){throw new Error('Another device updated the gist. Use Restore to take it, or Back up now to overwrite it.')}
       if(!confirm(`The gist was changed from another device (${fmtT(h.at)}).\n\nOK = overwrite it with the data on this device\nCancel = keep it (use Restore to take it instead)`)){gistBusy=false;renderGistSettings();return}}}
     const text=await gistEncrypt(serialisedData(),pass);const w=await gistWrite(m.gistId,text);
-    setGMeta({gistId:w.id,ver:w.ver,last:Date.now(),dirty:(gMeta().changedAt||0)>started,salt:JSON.parse(text).salt});if(manual)toast('✓ Backed up to GitHub gist')
+    setGMeta({gistId:w.id,ver:w.ver,stamp:dataStamp,last:Date.now(),dirty:(gMeta().changedAt||0)>started,salt:JSON.parse(text).salt});if(manual)toast('✓ Backed up to GitHub gist')
   }catch(e){gistErr=e.message;if(manual)toast(e.message)}
   finally{gistBusy=false;renderGistSettings();if(gMeta().dirty&&!gistErr)gistSchedule()}}
 async function connectGist(){try{const pass=gistCreds();gistBusy=true;gistErr='';renderGistSettings();
@@ -805,7 +872,7 @@ async function connectGist(){try{const pass=gistCreds();gistBusy=true;gistErr=''
 async function restoreFromGist(fromGate){try{const pass=gistCreds();gistBusy=true;renderGistSettings();
     const g=await gistFind();if(!g){throw new Error('No Cardly backup found in this GitHub account’s gists.')}
     if(!fromGate&&!confirm(`Replace ALL data on this device with the gist copy from ${fmtT(g.updated_at)}?\n\nWhat is currently on this device will be overwritten.`))return;
-    const r=await gistRead(g.id),d=await gistDecrypt(r.text,pass);applyData(d.data);
+    const r=await gistRead(g.id),d=await gistDecrypt(r.text,pass);applyData(d.data);markRestored();
     if(fromGate){mobileStorage=true;dataFileHandle=null}
     await saveDataFile();await load();setGMeta({connected:true,gistId:g.id,ver:r.ver,last:Date.now(),dirty:false,auto:true,salt:d.salt});
     if(fromGate){try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}showDashboard()}
@@ -845,10 +912,10 @@ function fbChanged(){if(!fbOn())return;setFMeta({dirty:true,changedAt:Date.now()
 function fbSchedule(){clearTimeout(fbTimer);if(!fbAutoOn())return;fbTimer=setTimeout(()=>fbNow(false),20000)}
 function fbSaveCfgFromInput(){const el=document.getElementById('fbConfigIn');if(el&&el.value.trim()){const o=parseFbConfig(el.value);dLS.set('cardly-fb-config',JSON.stringify(o));_fb=null;renderFbSettings()}}
 async function fbNow(manual){if(fbBusy||!fbOn())return;fbErr='';fbBusy=true;renderFbSettings();const started=Date.now();
-  try{const u=await fbUser(manual),m=fMeta(),remote=await fbGet(u);
+  try{stampGuard(fMeta());const u=await fbUser(manual),m=fMeta(),remote=await fbGet(u);
     if(remote&&m.rev!==undefined&&remote.rev!==m.rev){if(!manual)throw new Error('Another device updated the backup. Use Restore to take it, or Back up now to overwrite it.');
       if(!confirm(`The Firebase backup was changed from another device (${fmtT(remote.updatedAt)}).\n\nOK = overwrite it with the data on this device\nCancel = keep it (use Restore to take it instead)`)){fbBusy=false;renderFbSettings();return}}
-    const rev=(remote?remote.rev||0:0)+1;await fbPut(u,rev);setFMeta({rev,last:Date.now(),dirty:(fMeta().changedAt||0)>started,email:u.email||''});if(manual)toast('✓ Backed up to Firebase')
+    const rev=(remote?remote.rev||0:0)+1;await fbPut(u,rev);setFMeta({rev,stamp:dataStamp,last:Date.now(),dirty:(fMeta().changedAt||0)>started,email:u.email||''});if(manual)toast('✓ Backed up to Firebase')
   }catch(e){fbErr=e.message;if(manual)toast(e.message)}
   finally{fbBusy=false;renderFbSettings();if(fMeta().dirty&&!fbErr)fbSchedule()}}
 async function connectFb(){try{fbSaveCfgFromInput();fbBusy=true;fbErr='';renderFbSettings();const u=await fbUser(true),remote=await fbGet(u);
@@ -858,7 +925,7 @@ async function connectFb(){try{fbSaveCfgFromInput();fbBusy=true;fbErr='';renderF
 async function restoreFromFb(fromGate){try{if(fromGate&&!fbConfig()){const t=prompt('Paste your Firebase web config (the firebaseConfig { … } object):');if(!t)return;dLS.set('cardly-fb-config',JSON.stringify(parseFbConfig(t)));_fb=null}else fbSaveCfgFromInput();
     fbBusy=true;renderFbSettings();const u=await fbUser(true),remote=await fbGet(u);if(!remote)throw new Error('No Cardly backup found in this Firebase project.');
     if(!fromGate&&!confirm(`Replace ALL data on this device with the Firebase copy from ${fmtT(remote.updatedAt)}?\n\nWhat is currently on this device will be overwritten.`))return;
-    const data=await fbUnpack(remote);applyData(data);if(fromGate){mobileStorage=true;dataFileHandle=null}
+    const data=await fbUnpack(remote);applyData(data);markRestored();if(fromGate){mobileStorage=true;dataFileHandle=null}
     await saveDataFile();await load();setFMeta({connected:true,rev:remote.rev||0,last:Date.now(),dirty:false,auto:true,email:u.email||''});
     if(fromGate){try{localStorage.setItem('cardly-mobile-dirty','0');localStorage.setItem('cardly-mobile-synced',String(Date.now()))}catch(e){}showDashboard()}
     toast('✓ Restored from Firebase')
@@ -1236,7 +1303,7 @@ async function deleteCardById(cid){
   const what=[nt?`${nt} transaction${nt===1?'':'s'}`:'',nm?`${nm} milestone${nm===1?'':'s'}`:''].filter(Boolean).join(' and ');
   if(!confirm(`Delete "${bankName(c.bankId)} · ${c.name}"${what?` together with its ${what}`:''}?\n\nThis can't be undone. (Tip: to just hide a card, keep it and its history instead.)`))return;
   try{
-    state.transactions=state.transactions.filter(t=>t.cardId!==cid);state.milestones=state.milestones.filter(m=>m.cardId!==cid);
+    state.transactions.filter(t=>t.cardId===cid).forEach(t=>tomb('transactions',t.id));state.milestones.filter(m=>m.cardId===cid).forEach(m=>tomb('milestones',m.id));state.transactions=state.transactions.filter(t=>t.cardId!==cid);state.milestones=state.milestones.filter(m=>m.cardId!==cid);
     await del('cards',cid);
     if(cardDialog.open)cardDialog.close();
     if(cardPageOpen()){cardPage.hidden=true;document.getElementById('dashboard').hidden=false;placeDetailContent(false)}
