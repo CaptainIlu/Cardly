@@ -210,7 +210,7 @@ details.attgroup>summary.sectionhead{cursor:pointer;list-style:none;display:flex
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">Banks</div><div class="muted">This list fills the bank dropdown when adding or editing a card. Cards of the same bank are grouped for the AIS tracker.</div></div></div>
       <div class="panel bankgrid" id="bankList"></div>
-      <div class="toolbar" style="margin-top:12px"><input class="search" id="newBankName" placeholder="Add a bank (e.g. HDFC Bank)"><button class="btn primary" id="addBankBtn">Add</button></div>
+      <div class="toolbar" style="margin-top:12px"><input class="search" id="newBankName" placeholder="Add a bank (e.g. HDFC Bank)" list="stdBankList"><datalist id="stdBankList"></datalist><button class="btn primary" id="addBankBtn">Add</button></div>
     </section>
     <section class="section">
       <div class="sectionhead"><div><div class="sectiontitle">AIS tracker</div><div class="muted">Banks report bill payments to the Income Tax Dept at or above this amount per financial year.</div></div></div>
@@ -298,7 +298,7 @@ details.attgroup>summary.sectionhead{cursor:pointer;list-style:none;display:flex
 <button class="btn" id="syncMine"><b>Overwrite with this tab</b><small>Replaces the newer data. Only if this tab is the correct one.</small></button>
 <button class="rc-link" id="syncCopy" style="text-align:center">Download a copy of the newer data first</button><button class="btn" id="syncCancel">Not now</button></div></div></dialog>
 <dialog id="reconDialog"><div class="modal rc" style="max-height:90vh;overflow-y:auto"><div class="modalhead"><h2>Reconcile statement</h2><button class="iconbtn" onclick="reconDialog.close()">×</button></div>
-<div class="rc-top"><select id="reconCard" aria-label="Card"></select><div id="reconDrop" class="rc-drop" onclick="document.getElementById('reconFile').click()"><input id="reconFile" type="file" accept="application/pdf,.pdf" style="display:none"><span class="rc-dic">📄</span><span class="rc-dtx"><strong id="reconDropTitle">Choose statement PDF</strong><small>or drop it here · read on this device only</small></span></div></div>
+<div class="rc-top"><select id="reconCard" aria-label="Card"></select><div id="reconDrop" class="rc-drop" onclick="document.getElementById('reconFile').click()"><input id="reconFile" type="file" accept="application/pdf,.pdf" style="display:none"><span class="rc-dic">📄</span><span class="rc-dtx"><strong id="reconDropTitle">Choose statement PDFs</strong><small>or drop it here · read on this device only</small></span></div></div>
 <div style="text-align:right;margin:-4px 0 6px"><button class="rc-link" id="reconForgetPw" hidden onclick="reconForgetPw()">Forget saved PDF passwords</button></div>
 <div id="reconBody"></div></div></dialog>
 
@@ -1052,14 +1052,28 @@ function reconcile(items,card,period){
   const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
   return{matched,missing,extra,pairs,other,stmtDebits:sum(items.filter(l=>!l.credit),l=>l.amount),stmtCredits:sum(items.filter(l=>l.credit),l=>l.amount),mineDebits:sum(mine.filter(t=>t.type==='PURCHASE'),t=>Number(t.amount)||0)}}
 function groupMissing(list){const m=new Map();list.forEach(l=>{const k=[l.date,l.desc,l.amount,l.kind].join('|');const g=m.get(k);if(g)g.n++;else m.set(k,{...l,n:1,k,dk:[l.date,l.desc,l.amount].join('|')})});return [...m.values()]}
-function reconOpen(cardId){document.getElementById('reconFile').value='';document.getElementById('reconDropTitle').textContent='Choose statement PDF';document.getElementById('reconBody').innerHTML='';_recon=null;
+function reconOpen(cardId){document.getElementById('reconFile').value='';document.getElementById('reconDropTitle').textContent='Choose statement PDFs';document.getElementById('reconBody').innerHTML='';_recon=null;
   const sel=document.getElementById('reconCard');sel.innerHTML=state.cards.filter(c=>c.cardType!=='DEBIT'&&(c.active!==false||c.id===cardId)).map(c=>`<option value="${c.id}">${esc(bankName(c.bankId))} · ${esc(c.name)}${c.last4?' ·'+esc(c.last4):''}</option>`).join('');if(cardId)sel.value=cardId;reconRefreshPwBtn();reconDialog.showModal()}
-async function reconFilePicked(){const f=document.getElementById('reconFile').files[0];if(!f)return;const body=document.getElementById('reconBody');document.getElementById('reconDropTitle').textContent=f.name;body.innerHTML='<div class="muted">Reading statement…</div>';
-  try{const doc=await pdfOpen(await f.arrayBuffer(),document.getElementById('reconCard').value),rows=await pdfToRows(doc),lines=rows.map(r=>r.text),sum=stmtSummary(rows);
-    let items=parseStmtLines(lines);if(!items.length)throw new Error('No transactions could be read from this PDF. It may be a scanned image, or a layout I haven’t seen yet.');
-    const period0=stmtPeriod(lines,items,sum);items=resolveYears(items,period0,sum);const period=period0&&!period0.guess?period0:stmtPeriod(lines,items,sum);
-    const g=guessCardFromText(lines),sel=document.getElementById('reconCard');if(g&&g.id!==sel.value){sel.value=g.id;toast('Card detected from the statement: '+bankName(g.bankId)+' · '+g.name)}
-    _recon={items,period,summary:sum,ovr:{},names:{}};reconRun()}catch(e){body.innerHTML=`<div class="panel empty">${esc(e.message)}</div>`}}
+async function reconParseOne(f){const doc=await pdfOpen(await f.arrayBuffer(),document.getElementById('reconCard').value),rows=await pdfToRows(doc),lines=rows.map(r=>r.text),sum=stmtSummary(rows);
+  let items=parseStmtLines(lines);if(!items.length)throw new Error('No transactions could be read. It may be a scanned image, or a layout I haven’t seen yet.');
+  const p0=stmtPeriod(lines,items,sum);items=resolveYears(items,p0,sum);const period=p0&&!p0.guess?p0:stmtPeriod(lines,items,sum);
+  return{name:f.name,items,period,summary:sum,card:guessCardFromText(lines)}}
+function reconCombine(){const st=_recon.stms;_recon.items=st.flatMap(x=>x.items);const ps=st.map(x=>x.period).filter(Boolean);
+  _recon.period=ps.length?{start:ps.map(p=>p.start).sort()[0],end:ps.map(p=>p.end).sort().pop(),guess:ps.some(p=>p.guess)}:null;
+  const lat=[...st].sort((a,b)=>String(b.summary.stmtDate||b.period&&b.period.end||'').localeCompare(String(a.summary.stmtDate||a.period&&a.period.end||'')))[0];_recon.summary=lat?lat.summary:{}}
+function reconRemoveStm(i){_recon.stms.splice(i,1);if(!_recon.stms.length){_recon=null;document.getElementById('reconBody').innerHTML='';document.getElementById('reconDropTitle').textContent='Choose statement PDFs';return}reconCombine();reconTitle();reconRun()}
+function reconTitle(){const n=_recon?_recon.stms.length:0;document.getElementById('reconDropTitle').textContent=n>1?n+' statements loaded · add more':n?_recon.stms[0].name+' · add more':'Choose statement PDFs'}
+async function reconFilePicked(list){const files=[...(list||document.getElementById('reconFile').files||[])].filter(f=>/\.pdf$/i.test(f.name)||f.type==='application/pdf');document.getElementById('reconFile').value='';if(!files.length)return;
+  const body=document.getElementById('reconBody'),sel=document.getElementById('reconCard'),notes=[];if(!_recon)_recon={stms:[],ovr:{},names:{}};
+  for(let k=0;k<files.length;k++){const f=files[k];body.innerHTML=`<div class="muted">Reading statement ${k+1} of ${files.length}…</div>`;
+    try{const r=await reconParseOne(f),g=r.card;
+      if(g&&_recon.stms.length&&g.id!==sel.value){notes.push(f.name+': looks like a different card ('+bankName(g.bankId)+' · '+g.name+') — skipped');continue}
+      if(g&&!_recon.stms.length&&g.id!==sel.value){sel.value=g.id;toast('Card detected from the statement: '+bankName(g.bankId)+' · '+g.name)}
+      const key=x=>[x.period&&x.period.start,x.period&&x.period.end,x.items.length,x.items[0].date,x.items[0].amount].join('|');
+      if(_recon.stms.some(x=>key(x)===key(r))){notes.push(f.name+': same statement already added — skipped');continue}
+      _recon.stms.push(r)}catch(e){notes.push(f.name+': '+e.message)}}
+  _recon.notes=notes;if(!_recon.stms.length){const n=notes.join('<br>');_recon=null;body.innerHTML=`<div class="panel empty">${esc(n).replace(/&lt;br&gt;/g,'<br>')}</div>`;reconTitle();return}
+  _recon.stms.sort((a,b)=>String(a.period&&a.period.start||'').localeCompare(String(b.period&&b.period.start||'')));reconCombine();reconTitle();reconRun()}
 function reconKindOptions(l){const o=l.credit?[['PAYMENT','Payment'],['REFUND','Refund'],['CREDIT','Other credit (ignore)']]:[['PURCHASE','Purchase'],['CHARGE','Fee / charge']];return o.map(([v,t])=>`<option value="${v}"${l.kind===v?' selected':''}>${t}</option>`).join('')}
 function reconSetKind(i,v){const g=_recon.gm[i];if(!g)return;_recon.ovr[g.dk]=v;reconRun()}
 function reconRun(){if(!_recon)return;const card=cardById(document.getElementById('reconCard').value);if(!card)return;
@@ -1074,7 +1088,10 @@ function reconRun(){if(!_recon)return;const card=cardById(document.getElementByI
   const fact=(k,v)=>v===undefined||v===''?'':`<div><div class="k">${k}</div><div class="v">${v}</div></div>`;
   const facts=[fact('Total due',S.totalDue!==undefined?(S.totalDue<0?money(-S.totalDue)+' CR':money(S.totalDue)):undefined),fact('Minimum due',S.minDue!==undefined?money(Math.abs(S.minDue)):undefined),fact('Due date',S.dueDate?esc(displayDate(S.dueDate)):undefined),fact('Statement date',S.stmtDate?esc(displayDate(S.stmtDate)):undefined)].join('');
   const billBtn=canBill?(newer?`<div class="hint" style="font-size:12px;color:var(--muted);margin-top:12px">This card already has a newer bill (${esc(displayDate(card.billDate))}).</div>`:same?`<div style="margin-top:12px;font-size:13px;color:var(--good);font-weight:700">✓ Card bill already matches this statement</div>`:`<button class="btn primary" onclick="reconApplyBill()">Update card bill to ${money(Math.max(0,S.totalDue))}</button>`):'';
-  body.innerHTML=`<div class="rc-ctx"><b>${esc(bankName(card.bankId))} · ${esc(card.name)}</b><br>${P?esc(displayDate(P.start))+' → '+esc(displayDate(P.end)):'Period unknown'}${P&&P.guess?' (estimated)':''} · ${nTx} lines read</div>
+  const stm=_recon.stms.map((x,i)=>`<span class="rc-chip" style="display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border:1px solid var(--line);border-radius:99px;font-size:12px;margin:0 6px 6px 0">${x.period?esc(displayDate(x.period.start))+' → '+esc(displayDate(x.period.end)):esc(x.name)} · ${x.items.length}<button class="iconbtn" style="padding:0 2px" title="Remove" aria-label="Remove statement" onclick="reconRemoveStm(${i})">✕</button></span>`).join('');
+  const gap=_recon.stms.length>1?'<div class="hint" style="font-size:12px;color:var(--muted)">Statements are checked together. Cardly entries between statements that are not uploaded show as “not on statement”.</div>':'';
+  const nts=(_recon.notes||[]).map(n=>`<div class="hint" style="font-size:12px;color:var(--warn,#b45309)">${esc(n)}</div>`).join('');
+  body.innerHTML=`<div class="rc-ctx"><b>${esc(bankName(card.bankId))} · ${esc(card.name)}</b><br>${_recon.stms.length>1?_recon.stms.length+' statements · ':''}${P?esc(displayDate(P.start))+' → '+esc(displayDate(P.end)):'Period unknown'}${P&&P.guess?' (estimated)':''} · ${nTx} lines read</div>${_recon.stms.length>1||nts?`<div style="margin:8px 0">${stm}${gap}${nts}</div>`:''}
   <div class="rc-kpis"><div class="rc-kpi good"><div class="n">${R.matched.length}</div><div class="l">Matched</div></div><div class="rc-kpi ${R.missing.length?'bad':''}"><div class="n">${R.missing.length}</div><div class="l">Missing in Cardly</div></div><div class="rc-kpi ${R.extra.length?'warn':''}"><div class="n">${R.extra.length}</div><div class="l">Not on statement</div></div></div>
   <div class="rc-card"><div class="rc-cmp"><div><div class="k">Statement purchases</div><div class="v">${money(R.stmtDebits)}</div></div><div><div class="k">In Cardly</div><div class="v">${money(R.mineDebits)}</div></div></div><span class="rc-pill ${ok?'ok':'no'}">${ok?'✓ Totals agree':(diff>0?'Statement is '+money(diff)+' higher':'Cardly is '+money(-diff)+' higher')}</span>${facts?`<div class="rc-facts">${facts}</div>`:''}${billBtn}</div>
   ${gm.length?`<div class="rc-sec"><h3>Missing in Cardly <span class="cnt">${R.missing.length}</span></h3><div class="hint">Tick what to add. You can rename the merchant or change the type.</div>${missRows}<div class="rc-act"><button class="btn primary" onclick="reconAddSelected()">Add selected</button></div></div>`:''}
@@ -1094,7 +1111,7 @@ async function reconAddSelected(){const card=cardById(document.getElementById('r
       else await put('transactions',{id:id(),cardId:card.id,date:g.date,merchant:((_recon.names[g.dk]??'').trim()||niceMerchant(g.desc)),amount:g.amount,type:'PURCHASE',status:'COMPLETED',refundDate:'',...(g.time?{time:g.time}:{})});n++}
     await load();toast(`✓ Added ${n} transaction${n===1?'':'s'}`);reconRun();if(cardDetailOpen()&&detailDialog.dataset.cardId)openCard(detailDialog.dataset.cardId)}catch(e){toast('Could not add: '+e.message)}}
 document.getElementById('reconCard').onchange=()=>{if(_recon)reconRun()};
-document.getElementById('reconFile').onchange=()=>reconFilePicked();{const dz=document.getElementById('reconDrop');['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor='var(--accent)'}));['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor=''}));dz.addEventListener('drop',ev=>{const f=ev.dataTransfer&&ev.dataTransfer.files[0];if(f&&/\.pdf$/i.test(f.name))reconFilePicked(f);else toast('Please drop a PDF.')})}document.getElementById('reconCard').onchange=()=>{if(_recon)reconRun()};
+document.getElementById('reconFile').onchange=()=>reconFilePicked();document.getElementById('reconFile').multiple=true;{const dz=document.getElementById('reconDrop');['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor='var(--accent)'}));['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ev.preventDefault();dz.style.borderColor=''}));dz.addEventListener('drop',ev=>{const fs=[...(ev.dataTransfer&&ev.dataTransfer.files||[])].filter(f=>/\.pdf$/i.test(f.name));if(fs.length)reconFilePicked(fs);else toast('Please drop PDF files.')})}document.getElementById('reconCard').onchange=()=>{if(_recon)reconRun()};
 document.getElementById('backupConnectBtn').onclick=connectBackup;document.getElementById('backupNowBtn').onclick=()=>backupNow(true);document.getElementById('backupRestoreBtn').onclick=()=>restoreFromDrive(false);document.getElementById('backupDisconnectBtn').onclick=disconnectBackup;document.getElementById('driveRestoreGate').onclick=()=>restoreFromDrive(true);
 document.getElementById('backupAutoChk').onchange=e=>{setBMeta({auto:e.target.checked});if(e.target.checked&&bMeta().dirty)backupSchedule();backupRefreshUI()};
 const NOTIFY_KEY='cardly-notify-enabled', NOTIFY_SEEN_KEY='cardly-notify-seen';
@@ -1184,6 +1201,9 @@ function ensureSettings(){
 function ensureBanks(){
   let changed=false;
   if(!Array.isArray(state.banks))state.banks=[];
+  if(state.settings&&!state.settings.banksSeeded){state.settings.banksSeeded=true;changed=true;
+    if(!state.banks.length&&!state.cards.length){const h=n=>{let x=5381;for(const ch of n)x=(x*33^ch.charCodeAt(0))>>>0;return 'bk'+x.toString(36).padStart(6,'0').slice(-6)};
+      state.banks=Object.keys(DEFAULT_BANK_LOGOS).sort((a,b)=>a.localeCompare(b)).map(n=>({id:h(n),name:n,logoUrl:DEFAULT_BANK_LOGOS[n]}))}}
   if(!state.banks.length){
     const names=new Map();
     if(state.settings&&Array.isArray(state.settings.banks))state.settings.banks.forEach(n=>{const t=String(n||'').trim();if(t&&!names.has(t.toLowerCase()))names.set(t.toLowerCase(),t)});
@@ -1222,16 +1242,18 @@ function nextStatementDate(c){const day=Number(c.statementDay);if(!Number.isInte
 function renewalListDays(){return Number(state.settings&&state.settings.renewalListDays)||90}
 function bankIndexByName(name){const k=String(name||'').trim().toLowerCase();return state.banks.findIndex(b=>b.name.trim().toLowerCase()===k)}
 function addBankEntity(name){name=String(name||'').trim();if(!name)return null;const i=bankIndexByName(name);if(i>=0)return state.banks[i];const b={id:id(),name,logoUrl:DEFAULT_BANK_LOGOS[name]||''};state.banks.push(b);state.banks.sort((a,b2)=>a.name.localeCompare(b2.name));return b}
+const EXTRA_BANKS=['IDBI Bank','Canara Bank','Bank of India','Indian Bank','Bandhan Bank','South Indian Bank','Karur Vysya Bank','Jammu & Kashmir Bank','Indian Overseas Bank','Central Bank of India','UCO Bank','Bank of Maharashtra','Citibank','Scapia','OneCard','Jupiter','Fi Money','Uni'];
+function stdBanks(){const have=new Set(state.banks.map(b=>b.name.trim().toLowerCase()));return [...new Set([...Object.keys(DEFAULT_BANK_LOGOS),...EXTRA_BANKS])].filter(n=>!have.has(n.toLowerCase())).sort((a,b)=>a.localeCompare(b))}
 function populateBankSelect(selectedId=''){
   const list=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
-  cardBank.innerHTML='<option value="">Select bank</option>'+list.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')+'<option value="__new__">+ Add new bank…</option>';
+  cardBank.innerHTML='<option value="">Select bank</option>'+list.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')+(stdBanks().length?'<optgroup label="Popular banks">'+stdBanks().map(n=>`<option value="std:${esc(n)}">${esc(n)}</option>`).join('')+'</optgroup>':'')+'<option value="__new__">+ Other bank (type name)…</option>';
   cardBank.value=list.some(b=>b.id===selectedId)?selectedId:'';
   cardNewBank.hidden=true;cardNewBank.required=false;cardNewBank.value='';
 }
 cardBank.onchange=()=>{const isNew=cardBank.value==='__new__';cardNewBank.hidden=!isNew;cardNewBank.required=isNew;if(isNew)cardNewBank.focus()};
-function bankFromForm(f){let bankId=String(f.get('bank')||'').trim();if(bankId==='__new__'){const name=String(f.get('newBank')||'').trim();if(!name)throw new Error('Enter the new bank name.');return addBankEntity(name).id}if(!bankId)throw new Error('Select a bank.');if(!bankById(bankId))throw new Error('Select a bank.');return bankId}
+function bankFromForm(f){let bankId=String(f.get('bank')||'').trim();if(bankId.startsWith('std:'))return addBankEntity(bankId.slice(4)).id;if(bankId==='__new__'){const name=String(f.get('newBank')||'').trim();if(!name)throw new Error('Enter the new bank name.');return addBankEntity(name).id}if(!bankId)throw new Error('Select a bank.');if(!bankById(bankId))throw new Error('Select a bank.');return bankId}
 function showView(v){document.getElementById('cardPage').hidden=true;document.getElementById('dashboard').hidden=v!=='dashboard';document.getElementById('settingsPage').hidden=v!=='settings';if(v==='settings')renderSettings();else render();window.scrollTo(0,0)}
-function renderSettings(){
+function renderSettings(){document.getElementById('stdBankList').innerHTML=stdBanks().map(n=>`<option value="${esc(n)}">`).join('');
   renderHolderSettings();cardViewSelect.value=cardViewMode();renderDriveSettings();
   const counts=new Map();state.cards.forEach(c=>{if(c.bankId)counts.set(c.bankId,(counts.get(c.bankId)||0)+1)});
   const banks=[...state.banks].sort((a,b)=>a.name.localeCompare(b.name));
