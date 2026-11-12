@@ -1056,20 +1056,23 @@ function niceMerchant(desc){const n=mNorm(desc);let best=null;const seen=new Map
   let s=desc.replace(/\s+/g,' ').trim();if(s.length>2&&s===s.toUpperCase()&&/[A-Z]/.test(s))s=s.toLowerCase().replace(/\b[a-z]/g,c=>c.toUpperCase());return s}
 function reconcile(items,card,period){
   const mine=state.transactions.filter(t=>t.cardId===card.id&&t.date>=period.start&&t.date<=period.end);
-  const pool={PURCHASE:mine.filter(t=>t.type==='PURCHASE'),PAYMENT:mine.filter(t=>t.type==='PAYMENT'),REFUND:mine.filter(t=>t.type==='REFUND')},used=new Set(),matched=[],missing=[],other=[];
+  /* statements often list items dated just outside the cycle (posted late), so match against a slightly wider window; only in-cycle entries can show as "not on statement" */
+  const ds=items.map(l=>l.date).filter(Boolean).sort(),lo=addDaysStr(ds.length&&ds[0]<period.start?ds[0]:period.start,-7),hi=addDaysStr(ds.length&&ds[ds.length-1]>period.end?ds[ds.length-1]:period.end,7);
+  const wide=state.transactions.filter(t=>t.cardId===card.id&&t.date>=lo&&t.date<=hi),inMine=new Set(mine.map(t=>t.id));
+  const pool={PURCHASE:wide.filter(t=>t.type==='PURCHASE'),PAYMENT:wide.filter(t=>t.type==='PAYMENT'),REFUND:wide.filter(t=>t.type==='REFUND')},used=new Set(),matched=[],missing=[],other=[];
   const near=(l,t)=>Math.abs(Number(t.amount)-l.amount)<0.51;
   const pick=(l,list,maxDays)=>{let best=null,bs=-1;list.forEach(t=>{if(used.has(t.id)||!near(l,t))return;const dd=dayDiff(l.date,t.date);if(dd>maxDays)return;const s=10-dd+mSim(l.desc,t.merchant)*5;if(s>bs){bs=s;best=t}});return best};
   [...items].sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{
     if(l.kind==='CREDIT'){other.push(l);return}
     const key=l.kind==='PAYMENT'?'PAYMENT':l.kind==='REFUND'?'REFUND':'PURCHASE';let t=pick(l,pool[key],key==='PAYMENT'?5:6);
     if(!t&&key==='REFUND')t=pick(l,pool.PAYMENT,5);
-    if(!t&&key==='REFUND'){t=pick(l,mine.filter(x=>x.type==='PURCHASE'&&x.status==='REFUNDED'),30)}
+    if(!t&&key==='REFUND'){t=pick(l,wide.filter(x=>x.type==='PURCHASE'&&x.status==='REFUNDED'),30)}
     if(t){used.add(t.id);matched.push({l,t})}else missing.push(l)});
   let extra=mine.filter(t=>!used.has(t.id)).sort(txnNewestFirst);const pairs=[];
   for(const l of [...missing]){if(l.kind!=='PURCHASE'&&l.kind!=='CHARGE')continue;let best=null,bs=0;extra.forEach(t=>{if(t.type!=='PURCHASE'||pairs.some(p=>p.t===t))return;const sm=mSim(l.desc,t.merchant);if(sm<0.5||dayDiff(l.date,t.date)>6)return;if(sm>bs){bs=sm;best=t}});
     if(best){pairs.push({l,t:best});extra=extra.filter(x=>x!==best);missing.splice(missing.indexOf(l),1)}}
   const sum=(a,f)=>a.reduce((s,x)=>s+f(x),0);
-  return{matched,missing,extra,pairs,other,stmtDebits:sum(items.filter(l=>!l.credit),l=>l.amount),stmtCredits:sum(items.filter(l=>l.credit),l=>l.amount),mineDebits:sum(mine.filter(t=>t.type==='PURCHASE'),t=>Number(t.amount)||0)}}
+  return{matched,missing,extra,pairs,other,stmtDebits:sum(items.filter(l=>!l.credit),l=>l.amount),stmtCredits:sum(items.filter(l=>l.credit),l=>l.amount),mineDebits:sum([...mine,...matched.map(m=>m.t).filter(t=>!inMine.has(t.id))].filter(t=>t.type==='PURCHASE'),t=>Number(t.amount)||0)}}
 function groupMissing(list){const m=new Map();list.forEach(l=>{const k=[l.date,l.desc,l.amount,l.kind].join('|');const g=m.get(k);if(g)g.n++;else m.set(k,{...l,n:1,k,dk:[l.date,l.desc,l.amount].join('|')})});return [...m.values()]}
 function reconOpen(cardId){document.getElementById('reconFile').value='';document.getElementById('reconDropTitle').textContent='Choose statement PDFs';document.getElementById('reconBody').innerHTML='';_recon=null;
   const sel=document.getElementById('reconCard');sel.innerHTML=state.cards.filter(c=>c.cardType!=='DEBIT'&&(c.active!==false||c.id===cardId)).map(c=>`<option value="${c.id}">${esc(bankName(c.bankId))} · ${esc(c.name)}${c.last4?' ·'+esc(c.last4):''}</option>`).join('');if(cardId)sel.value=cardId;reconRefreshPwBtn();reconDialog.showModal()}
