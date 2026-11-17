@@ -1021,10 +1021,10 @@ function fin(d,line,m){let rest=line.slice(m[0].length).trim();
   rest=rest.replace(/^[·•|\-–]\s*/,'');return{...d,rest}}
 function cleanMerchant(d){return d.replace(/^(.{10,}?)\1(.+)$/i,(m,a,b)=>a+' '+b.charAt(0).toUpperCase()+b.slice(1)).replace(/^\s*(?:EMI|No Cost EMI)\s+(?=\S)/i,'').replace(/\(\s*(Convert To EMI|Pay in EMIs)\s*\)/gi,'').replace(/\s+356\s*$/,'').replace(/\s{2,}/g,' ').replace(/\s+/g,' ').trim()}
 function classifyStm(desc,credit){const d=desc.toLowerCase();
-  if(credit){if(/refund|reversal|return|chargeback|dispute/.test(d)&&!/cashback credit/.test(d))return 'REFUND';if(/payment|upi|bbps|imps|neft|rtgs|auto.?debit|direct debit|bill\s*pay|ibank|net.?banking|mobile banking|billdesk|thank/.test(d))return 'PAYMENT';if(/cashback|reward|points|waiver|bonus|interest.*(reversal|credit)/.test(d))return 'CREDIT';return 'REFUND'}
+  if(credit){if(/refund|reversal|return|chargeback|dispute/.test(d)&&!/cashback credit/.test(d))return 'REFUND';if(/payment|pymt|bppy|upi|bbps|imps|neft|rtgs|auto.?debit|direct debit|bill\s*pay|ibank|net.?banking|mobile banking|billdesk|thank/.test(d))return 'PAYMENT';if(/cashback|reward|points|waiver|bonus|interest.*(reversal|credit)/.test(d))return 'CREDIT';return 'REFUND'}
   if(/\b(annual|joining|renewal|late payment|finance|interest|igst|cgst|sgst|gst|processing|overlimit|overdrawn|over\s*limit|fee|charges?|surcharge)\b/.test(d)&&!/swiggy|zomato|amazon|flipkart/.test(d))return 'CHARGE';return 'PURCHASE'}
 const AMT_RE=/(?:^|\s)([+\-−])?\s*[₹`]?\s*(?:C\s+)?([+\-−])?\s*([\d,]*\d\.\d{2})\s*(CR|DR|C|D)?\s*$/i,AMT2_RE=/(?:^|\s)[₹`]?\s*([\d,]*\d\.\d{2})\s*(CR|DR)\s+[₹`]?\s*[\d,]*\d\.\d{2}\s*(?:CR|DR)\s*$/i;
-function parseStmtLines(lines){lines=lines.map(l=>l.replace(/^(\s*\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\s*\|?\s*(?:\d{1,2}:\d{2}\s+)?)(?:EMI|NEW)\s+(?=\S)/i,'$1').replace(/^(\s*\d{1,2}[\/-][A-Za-z]{3}[\/-]\d{2,4}\s+)NA\s+(?=\S)/i,'$1'));const out=[],used=new Set();
+function parseStmtLines(lines){lines=lines.map(l=>l.replace(/\bRs\.?\s*(-?[\d,]*\d)(?![\d,]|\.\d)/gi,'₹$1.00').replace(/\bRs\.?\s*/gi,'₹').replace(/^(\s*\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\s*\|?\s*(?:\d{1,2}:\d{2}\s+)?)(?:EMI|NEW)\s+(?=\S)/i,'$1').replace(/^(\s*\d{1,2}[\/-][A-Za-z]{3}[\/-]\d{2,4}\s+)NA\s+(?=\S)/i,'$1'));const out=[],used=new Set();
   const textOnly=l=>{if(l==null||l.length<4||leadDate(l)||AMT_RE.test(l)||/^(date|domestic|international|page|transaction|statement|note|offers|important)\b/i.test(l)||/\[|^\W+$/.test(l))return false;return true};
   for(let li=0;li<lines.length;li++){const raw=lines[li].replace(/(\d\.\d{2})\s+[lI]\s*$/,'$1');
     if(/^(CR|Cr)$/.test(raw.trim())&&out.length&&out[out.length-1]._li===li-1){const p=out[out.length-1];p.credit=true;p.kind=classifyStm(p.desc,true);continue}      // Amex: "CR" printed on the next row
@@ -1037,7 +1037,8 @@ function parseStmtLines(lines){lines=lines.map(l=>l.replace(/^(\s*\d{1,2}[\/-]\d
     desc=desc.replace(/\s+(-?\d+\s+)?INR\s+[\d,]+\.\d{2}\s*$/,'').replace(/^(?:R\d{4,}|\d{6,})\s+/,'');                                                   // BOB reference / points / source amount
     const seg=desc.split(/\s{2,}/).filter(Boolean);desc=cleanMerchant(seg.length?seg[0]:desc);
     if(!desc||desc.length<2||/^(opening|closing|previous) balance|net outstanding|^total\b/i.test(desc))continue;
-    out.push({date:ld.iso||null,md:ld.md||null,time:ld.time||'',desc,amount,credit,kind:classifyStm(desc,credit),raw:raw.replace(/\s+/g,' ').slice(0,160),_li:li})}
+    if(!(amount>0)||!/[A-Za-z]{3,}/.test(desc.replace(/₹/g,'')))continue;const cr=credit||/^payment (?:received|credit)\b|^repayment\b|^refund\b|thank you\s*$/i.test(desc);
+    out.push({date:ld.iso||null,md:ld.md||null,time:ld.time||'',desc,amount,credit:cr,kind:classifyStm(desc,cr),raw:raw.replace(/\s+/g,' ').slice(0,160),_li:li})}
   return out}
 const pad2=n=>String(n).padStart(2,'0');
 function convDate(s){let mm=s.match(new RegExp('('+MONRE+')\\.?\\s+(\\d{1,2}),?\\s+(\\d{4})','i'));if(mm)return isoFrom(mm[2],mm[1],mm[3]);let m=s.match(/(\d{1,2})[\/\-. ]([\dA-Za-z]{2,9}),?[\/\-. ](\d{2,4})/);return m?isoFrom(m[1],isNaN(m[2])?m[2]:m[2],m[3]):null}
@@ -1061,8 +1062,10 @@ function stmtSummary(rows){const out={};
       if(val===undefined){for(let k=ri+1;k<rows.length&&k<=ri+3&&val===undefined;k++){const q=rows[k];if(q.page!==r.page||r.y-q.y>34)continue;const txt=q.items.filter(it=>{const c=it.x+it.w/2;return c>=x0-30&&c<=x1+30}).map(it=>it.s).join(' ');val=parse(txt)}}
       if(val!==undefined)out[key]=val}}
   return out}
-function guessCardFromText(lines){const txt=lines.slice(0,80).join(' \n ').toLowerCase();let best=null,sc=0;
-  state.cards.filter(c=>c.last4&&c.cardType!=='DEBIT').forEach(c=>{const re=new RegExp('(?:x|\\*|\\s|-)'+c.last4+'(?!\\d)','i');let s=0;if(re.test(txt))s+=2;const bn=bankName(c.bankId).toLowerCase().split(/\s+/)[0];if(bn&&txt.includes(bn))s+=2;if(txt.includes(String(c.name).toLowerCase().split(/\s+/)[0]))s+=1;if(s>sc){sc=s;best=c}});return sc>=3?best:null}
+function guessCardFromText(lines){const txt=lines.slice(0,150).join(' \n ').toLowerCase(),ALIAS={jupiter:'csb',csb:'jupiter',scapia:'federal',federal:'scapia'};
+  const sc=state.cards.filter(c=>c.cardType!=='DEBIT').map(c=>{let s=0;if(c.last4&&new RegExp('(?:x|\\*|\\s|-)'+c.last4+'(?!\\d)','i').test(txt))s+=3;const bn=bankName(c.bankId).toLowerCase().split(/\s+/)[0];if(bn&&(txt.includes(bn)||ALIAS[bn]&&txt.includes(ALIAS[bn])))s+=2;
+    const w=String(c.name).toLowerCase().split(/[^a-z0-9]+/).filter(x=>x.length>=3);if(w.length&&w.every(x=>txt.includes(x)))s+=1;return{c,s}}).filter(x=>x.s>0).sort((a,b)=>b.s-a.s);
+  if(!sc.length)return null;const top=sc[0];if(top.s>=3&&(!sc[1]||sc[1].s<top.s))return top.c;if(top.s>=2&&!sc.some((x,i)=>i&&x.s>=2))return top.c;return null}
 const mNorm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 function mSim(a,b){a=mNorm(a);b=mNorm(b);if(!a||!b)return 0;if(a===b)return 1;if(a.includes(b)||b.includes(a))return .8;let i=0;const n=Math.min(a.length,b.length);while(i<n&&a[i]===b[i])i++;return i/Math.max(a.length,b.length)}
 const dayDiff=(a,b)=>Math.abs((new Date(a)-new Date(b))/864e5);
@@ -1089,7 +1092,7 @@ function reconcile(items,card,period){
     if(t){used.add(t.id);matched.push({l,t})}else missing.push(l)});
   /* second pass: amounts you rounded by hand (256.7→257, 7655→7660, 7655→7700) with the same merchant and nearly the same date count as matched, flagged "approx" */
   const rounded=(l,t)=>{const a=Number(t.amount),d=Math.abs(a-l.amount);if(d<0.51)return true;if(a%100===0)return d<=50;if(a%10===0)return d<=5;if(a%1===0)return d<1;return false};
-  [...missing].forEach(l=>{if(l.kind!=='PURCHASE'&&l.kind!=='CHARGE')return;let best=null,bs=-1;pool.PURCHASE.forEach(t=>{if(used.has(t.id)||!rounded(l,t))return;const dd=dayDiff(l.date,t.date),sm=mSim(l.desc,t.merchant);if(dd>6||sm<0.4)return;const sc=sm*10-dd-Math.abs(Number(t.amount)-l.amount)/Math.max(1,l.amount);if(sc>bs){bs=sc;best=t}});
+  [...missing].forEach(l=>{const key=l.kind==='PAYMENT'?'PAYMENT':l.kind==='REFUND'?'REFUND':l.kind==='PURCHASE'||l.kind==='CHARGE'?'PURCHASE':null;if(!key)return;let best=null,bs=-1;pool[key].forEach(t=>{if(used.has(t.id)||!rounded(l,t))return;const dd=dayDiff(l.date,t.date),sm=key==='PURCHASE'?mSim(l.desc,t.merchant):1;if(dd>6||sm<0.4)return;const sc=sm*10-dd-Math.abs(Number(t.amount)-l.amount)/Math.max(1,l.amount);if(sc>bs){bs=sc;best=t}});
     if(best){used.add(best.id);matched.push({l,t:best,approx:true});missing.splice(missing.indexOf(l),1)}});
   let extra=mine.filter(t=>!used.has(t.id)).sort(txnNewestFirst);const pairs=[];
   for(const l of [...missing]){if(l.kind!=='PURCHASE'&&l.kind!=='CHARGE')continue;let best=null,bs=0;extra.forEach(t=>{if(t.type!=='PURCHASE'||pairs.some(p=>p.t===t))return;const sm=mSim(l.desc,t.merchant);if(sm<0.5||dayDiff(l.date,t.date)>6)return;if(sm>bs){bs=sm;best=t}});
@@ -1100,12 +1103,15 @@ function groupMissing(list){const m=new Map();list.forEach(l=>{const k=[l.date,l
 function reconOpen(cardId){document.getElementById('reconFile').value='';document.getElementById('reconDropTitle').textContent='Choose statement PDFs';document.getElementById('reconBody').innerHTML='';_recon=null;
   const sel=document.getElementById('reconCard');sel.innerHTML=state.cards.filter(c=>c.cardType!=='DEBIT'&&(c.active!==false||c.id===cardId)).map(c=>`<option value="${c.id}">${esc(bankName(c.bankId))} · ${esc(c.name)}${c.last4?' ·'+esc(c.last4):''}</option>`).join('');if(cardId)sel.value=cardId;reconRefreshPwBtn();reconDialog.showModal()}
 /* Statements with a separate "Merchant Category" column (Yes Bank etc.): the description column sits next to it and wraps onto lines above/below the dated row, so rebuild each transaction by column position instead of by text order. */
-function colFixLines(rows){const out=[];let H=null,H2=null,pre=[];
+function colFixLines(rows){const out=[];let H=null,H2=null,H3=null,pre=[];
   const hx=(r,w)=>{const it=r.items.find(i=>i.s.includes(w));return it?it.x:null};
   const flush=()=>{pre.forEach(p=>out.push(p.text));pre=[]};
   for(const r of rows){
     if(/Transaction Details/i.test(r.text)&&/Merchant Category/i.test(r.text)){const d=hx(r,'Transaction'),c=hx(r,'Merchant'),a=hx(r,'Amount');if(d!=null&&c!=null&&a!=null&&c>d){H={d,c,a};flush();out.push(r.text);continue}}
     if(/Transaction ID/i.test(r.text)&&/Transaction Description/i.test(r.text)){const k=r.items.findIndex(i=>i.s.includes('Description')),d=k<0?null:(!r.items[k].s.includes('Transaction')&&k>0&&/^Transaction$/i.test(r.items[k-1].s.trim())?r.items[k-1].x:r.items[k].x),p=Math.min(...r.items.filter(i=>/^(Cash|Points)/i.test(i.s.trim())).map(i=>i.x));if(d!=null){H2={d,p:isFinite(p)?p:null};H=null;flush();out.push(r.text);continue}}
+    if(/Description/i.test(r.text)&&r.items.length<=8){const dI=r.items.find(i=>/^Date$/i.test(i.s.trim())&&i.x>150);if(dI){H3={d:dI.x};H=null;H2=null;flush();out.push(r.text);continue}}
+    if(H3){/* table sits to the right of a side panel (RBL): split each row into its left-panel text and its table text */
+      const L=r.items.filter(i=>i.x<H3.d-6),Rt=r.items.filter(i=>i.x>=H3.d-6&&!/^\(xx\d+\)$/i.test(i.s.trim()));if(L.length&&Rt.length){out.push(L.map(i=>i.s).join(' '));let seg=[];const dI=i=>/^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$/.test(i.s.trim());Rt.forEach(i=>{if(dI(i)&&seg.length){out.push(seg.map(z=>z.s).join(' '));seg=[]}seg.push(i)});out.push(seg.map(z=>z.s).join(' '));continue}}
     if(H2){const dt=r.text.match(/^\d{2}[\/-]\d{2}[\/-]\d{4}/);
       if(dt){const di=r.items.filter(i=>i.x>=H2.d-3&&(H2.p==null||i.x<H2.p-3)),idc=r.items.filter(i=>i.x>r.items[0].x+5&&i.x<H2.d-3&&!/^\d{2}[\/-]/.test(i.s));
         if(di.length&&idc.length){out.push(dt[0]+' '+di.map(i=>i.s).join(' ').replace(/\s+/g,' ').trim());continue}}
@@ -1119,9 +1125,13 @@ function colFixLines(rows){const out=[];let H=null,H2=null,pre=[];
     flush();out.push(r.text)}
   flush();return out}
 async function reconParseOne(f){const doc=await pdfOpen(await f.arrayBuffer(),document.getElementById('reconCard').value),rows=await pdfToRows(doc),lines=colFixLines(rows),sum=stmtSummary(rows);
-  let items=parseStmtLines(lines);if(!items.length)throw new Error('No transactions could be read. It may be a scanned image, or a layout I haven’t seen yet.');
+  let items=parseStmtLines(lines);if(!items.length)items=parseStmtLines(rows.map(r=>r.text));if(!items.length)throw new Error('No transactions could be read. It may be a scanned image, or a layout I haven’t seen yet.');
   const p0=stmtPeriod(lines,items,sum);items=resolveYears(items,p0,sum);const period=p0&&!p0.guess?p0:stmtPeriod(lines,items,sum);
-  return{name:f.name,items,period,summary:sum,card:guessCardFromText(lines)}}
+  /* drop stray dated lines (terms & conditions examples) by distance from the bulk of the statement's dates, never by a possibly wrong period */
+  const dd=items.map(l=>l.date).filter(Boolean).sort();if(dd.length>2){const med=dd[Math.floor(dd.length/2)],ok=items.filter(l=>!l.date||Math.abs(dayDiff(l.date,med))<=150);if(ok.length)items=ok}
+  const mask=x=>String(x).replace(/\d{9,}/g,m=>'#'.repeat(m.length)),dl=/\d{1,2}[\s\/-](?:[A-Za-z]{3,9}|\d{1,2})[\s\/-]\d{2,4}/;
+  const diag='Cardly diagnostic · '+rows.length+' rows · '+items.length+' transactions read · period '+(period?period.start+'→'+period.end:'?')+'\n--- rows (x:text) ---\n'+rows.filter(r=>dl.test(r.text)||/\b(Date|Description|Amount|Transaction|Details|Merchant)\b/i.test(r.text)).slice(0,70).map(r=>mask(r.items.map(i=>Math.round(i.x)+':'+i.s).join(' | '))).join('\n')+'\n--- lines after layout fix ---\n'+lines.filter(l=>dl.test(l)).slice(0,40).map(mask).join('\n')+'\n--- read ---\n'+items.slice(0,40).map(l=>[l.date,l.amount,l.kind,mask(l.desc)].join(' · ')).join('\n');
+  return{name:f.name,items,period,summary:sum,card:guessCardFromText(lines),diag}}
 function reconCombine(){const st=_recon.stms;_recon.items=st.flatMap(x=>x.items);const ps=st.map(x=>x.period).filter(Boolean);
   _recon.period=ps.length?{start:ps.map(p=>p.start).sort()[0],end:ps.map(p=>p.end).sort().pop(),guess:ps.some(p=>p.guess)}:null;
   const lat=[...st].sort((a,b)=>String(b.summary.stmtDate||b.period&&b.period.end||'').localeCompare(String(a.summary.stmtDate||a.period&&a.period.end||'')))[0];_recon.summary=lat?lat.summary:{}}
@@ -1167,6 +1177,8 @@ async function reconApplyBill(){const card=cardById(document.getElementById('rec
   if(!confirm(`Set ${card.name}'s current bill to ${money(Math.max(0,S.totalDue))} with bill date ${displayDate(S.stmtDate)}?\n\nPayments dated on or after the bill date will count against it.`))return;
   card.currentBill=Math.max(0,S.totalDue);card.billDate=S.stmtDate;card.billNotDue=S.totalDue<=0;try{await put('cards',card);await load();toast('✓ Card bill updated from statement');reconRun();if(cardDetailOpen()&&detailDialog.dataset.cardId)openCard(detailDialog.dataset.cardId)}catch(e){toast('Could not update: '+e.message)}}
 async function reconFix(i){const p=_recon&&_recon.res&&_recon.res.pairs[i];if(!p)return;p.t.amount=p.l.amount;p.t.date=p.l.date;try{await put('transactions',p.t);await load();toast('✓ Updated to the statement values');reconRun()}catch(e){toast('Could not update: '+e.message)}}
+async function reconCopyDiag(){const t=(_recon&&_recon.stms||[]).map(x=>x.diag).join('\n\n=====\n\n');try{await navigator.clipboard.writeText(t);toast('Copied. Paste it to me — it has dates, amounts and merchant names but no card number.')}catch(e){const w=window.prompt('Copy this text:',t)}}
+(function(){const f=reconRun;reconRun=function(){f();const b=document.getElementById('reconBody');if(_recon&&b)b.insertAdjacentHTML('beforeend','<div class="meta" style="margin:16px 0 4px;text-align:center"><a href="#" onclick="reconCopyDiag();return false">Statement read wrongly? Copy diagnostic text</a></div>')}})();
 async function reconFixApprox(id){const m=_recon&&_recon.res&&_recon.res.matched.find(x=>x.approx&&x.t.id===id);if(!m)return;m.t.amount=m.l.amount;try{await put('transactions',m.t);await load();toast('✓ Amount updated to the statement');reconRun()}catch(e){toast('Could not update: '+e.message)}}
 function reconFindOrig(card,l){const cand=state.transactions.filter(t=>t.cardId===card.id&&t.type==='PURCHASE'&&t.status!=='REFUNDED'&&t.date<=l.date&&Math.abs(Number(t.amount)-l.amount)<0.51&&refundCap(t)>=l.amount-0.51);cand.sort((a,b)=>mSim(l.desc,b.merchant)-mSim(l.desc,a.merchant)||b.date.localeCompare(a.date));return cand[0]||null}
 async function reconAddSelected(){const card=cardById(document.getElementById('reconCard').value);if(!card||!_recon)return;const picks=[...document.querySelectorAll('.reconChk:checked')].map(c=>_recon.gm[Number(c.dataset.i)]).filter(Boolean);if(!picks.length){toast('Nothing selected.');return}
