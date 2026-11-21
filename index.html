@@ -1068,7 +1068,7 @@ function parseStmtLines(lines){lines=lines.map(l=>l.replace(/\bRs\.?\s*(-?[\d,]*
     desc=desc.replace(/\s+(-?\d+\s+)?INR\s+[\d,]+\.\d{2}\s*$/,'').replace(/^(?:R\d{4,}|\d{6,})\s+/,'');                                                   // BOB reference / points / source amount
     const seg=desc.split(/\s{2,}/).filter(Boolean);desc=cleanMerchant(seg.length?seg[0]:desc);
     if(!desc||desc.length<2||/^(opening|closing|previous) balance|net outstanding|^total\b/i.test(desc))continue;
-    if(!(amount>0)||!/[A-Za-z]{3,}/.test(desc.replace(/₹/g,''))||/^(?:payment due date|min\.?\s*amount due|total (?:amount )?due|total outstanding|statement date)\b/i.test(desc.trim()))continue;const cr=credit||/^payment (?:received|credit)\b|^repayment\b|^refund\b|thank you\s*$/i.test(desc);
+    if(!(amount>0)||!/[A-Za-z]{3,}/.test(desc.replace(/₹/g,''))||/^(?:bonus points credit|excess credit bal|wrong credit bal)/i.test(desc.trim())||/^(?:payment due date|min\.?\s*amount due|total (?:amount )?due|total outstanding|statement date)\b/i.test(desc.trim()))continue;const cr=credit||/^payment (?:received|credit)\b|^repayment\b|^refund\b|thank you\s*$/i.test(desc);
     out.push({date:ld.iso||null,md:ld.md||null,time:ld.time||'',desc,amount,credit:cr,kind:classifyStm(desc,cr),raw:raw.replace(/\s+/g,' ').slice(0,160),_li:li})}
   return out}
 const pad2=n=>String(n).padStart(2,'0');
@@ -1134,13 +1134,17 @@ function groupMissing(list){const m=new Map();list.forEach(l=>{const k=[l.date,l
 function reconOpen(cardId){document.getElementById('reconFile').value='';document.getElementById('reconDropTitle').textContent='Choose statement PDFs';document.getElementById('reconBody').innerHTML='';_recon=null;
   const sel=document.getElementById('reconCard');sel.innerHTML=state.cards.filter(c=>c.cardType!=='DEBIT'&&(c.active!==false||c.id===cardId)).map(c=>`<option value="${c.id}">${esc(bankName(c.bankId))} · ${esc(c.name)}${c.last4?' ·'+esc(c.last4):''}</option>`).join('');if(cardId)sel.value=cardId;reconRefreshPwBtn();reconDialog.showModal()}
 /* Statements with a separate "Merchant Category" column (Yes Bank etc.): the description column sits next to it and wraps onto lines above/below the dated row, so rebuild each transaction by column position instead of by text order. */
-function colFixLines(rows){const out=[];let H=null,H2=null,H3=null,pre=[];
+function colFixLines(rows){const out=[];let H=null,H2=null,H3=null,H4=null,pre=[];
   const hx=(r,w)=>{const it=r.items.find(i=>i.s.includes(w));return it?it.x:null};
   const flush=()=>{pre.forEach(p=>out.push(p.text));pre=[]};
   for(const r of rows){
     if(/Transaction Details/i.test(r.text)&&/Merchant Category/i.test(r.text)){const d=hx(r,'Transaction'),c=hx(r,'Merchant'),a=hx(r,'Amount');if(d!=null&&c!=null&&a!=null&&c>d){H={d,c,a};flush();out.push(r.text);continue}}
     if(/Transaction ID/i.test(r.text)&&/Transaction Description/i.test(r.text)){const k=r.items.findIndex(i=>i.s.includes('Description')),d=k<0?null:(!r.items[k].s.includes('Transaction')&&k>0&&/^Transaction$/i.test(r.items[k-1].s.trim())?r.items[k-1].x:r.items[k].x),p=Math.min(...r.items.filter(i=>/^(Cash|Points)/i.test(i.s.trim())).map(i=>i.x));if(d!=null){H2={d,p:isFinite(p)?p:null};H=null;flush();out.push(r.text);continue}}
     if(/Description/i.test(r.text)&&r.items.length<=8){const dI=r.items.find(i=>/^Date$/i.test(i.s.trim())&&i.x>150);if(dI){H3={d:dI.x};H=null;H2=null;flush();out.push(r.text);continue}}
+    if(/Transaction Date/i.test(r.text)&&/Post Date/i.test(r.text)&&/Trnx Details|Transaction Details/i.test(r.text)){const di=r.items.find(i=>/Trnx Details|Transaction Details/i.test(i.s)),ai=r.items.find(i=>/^Amount/i.test(i.s.trim()));if(di&&ai){H4={d:di.x-10,a:ai.x};H=H2=H3=null;flush();out.push(r.text);continue}}
+    if(H4){const dm4=r.items.filter(i=>i.x<H4.d-20&&/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(i.s.trim()));
+      if(dm4.length){const de=r.items.filter(i=>i.x>=H4.d&&i.x<H4.a-12),am=r.items.filter(i=>i.x>=H4.a-12&&i.x<H4.a+80&&(i.x<H4.a+45||/^(Cr|Dr)$/i.test(i.s.trim())));out.push(dm4[0].s.trim()+' '+de.map(i=>i.s).join(' ').replace(/\s+/g,' ').trim()+' '+am.map(i=>i.s).join(' '));continue}
+      out.push(r.text);continue}
     if(H3){/* table sits to the right of a side panel (RBL): split each row into its left-panel text and its table text */
       const L=r.items.filter(i=>i.x<H3.d-6),Rt=r.items.filter(i=>i.x>=H3.d-6&&!/^\(xx\d+\)$/i.test(i.s.trim()));if(L.length&&Rt.length){out.push(L.map(i=>i.s).join(' '));let seg=[];const dI=i=>/^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}$/.test(i.s.trim());Rt.forEach(i=>{if(dI(i)&&seg.length){out.push(seg.map(z=>z.s).join(' '));seg=[]}seg.push(i)});out.push(seg.map(z=>z.s).join(' '));continue}}
     if(H2){const dt=r.text.match(/^\d{2}[\/-]\d{2}[\/-]\d{4}/);
